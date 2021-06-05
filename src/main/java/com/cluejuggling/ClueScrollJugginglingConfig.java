@@ -10,7 +10,7 @@ public interface ClueScrollJugginglingConfig extends Config
 	@ConfigItem(
 		keyName = "notificationTime",
 		name = "Notification at",
-		description = "Time remaining (seconds) on despawn timer to send notification.",
+		description = "Time remaining (seconds) on despawn timer to send notification. Set to 181 or greater to disable the notification.",
 		position = 0
 	)
 	default int notificationTime()

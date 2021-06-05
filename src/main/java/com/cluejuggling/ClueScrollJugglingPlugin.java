@@ -98,8 +98,12 @@ public class ClueScrollJugglingPlugin extends Plugin
 //					int green = (int) (green1 + ((green2 - green1) * stage));
 //					int blue = (int) (blue1 + ((blue2 - blue1) * stage));
 //					return new Color(red, green, blue);
-					if (Duration.between(Instant.now(), this.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0) {
-						return Color.RED;
+					if (config.notificationTime() <= 180)
+					{
+						if (Duration.between(Instant.now(), this.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
+						{
+							return Color.RED;
+						}
 					}
 					return super.getTextColor();
 				}
@@ -130,11 +134,14 @@ public class ClueScrollJugglingPlugin extends Plugin
 		{
 			GroundItem.GroundItemKey groundItemKey = groundItemKeyTimerEntry.getKey();
 			Timer timer = groundItemKeyTimerEntry.getValue();
-			System.out.println(timer.getName());
-			if (Duration.between(Instant.now(), timer.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0 && !alreadyNotified.contains(groundItemKey)) {
-				timer.getTextColor();
-				notifier.notify("Your clue scroll is about to disappear!");
-				alreadyNotified.add(groundItemKey);
+			if (config.notificationTime() <= 180)
+			{
+				if (Duration.between(Instant.now(), timer.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0 && !alreadyNotified.contains(groundItemKey))
+				{
+					timer.getTextColor();
+					notifier.notify("Your clue scroll is about to disappear!");
+					alreadyNotified.add(groundItemKey);
+				}
 			}
 		}
 	}
