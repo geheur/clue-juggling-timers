@@ -30,9 +30,9 @@ import java.util.Map;
 import java.util.Set;
 
 @PluginDescriptor(
-	name = "Clue Juggling",
-	description = "clue juggling timers",
-	tags = {"clue", "juggling", "league", "trailblazer"}
+	name = "Clue Juggling Timer",
+	description = "clue despawn timers",
+	tags = {"clue", "juggling", "timer", "despawn"}
 )
 @Slf4j
 public class ClueScrollJugglingPlugin extends Plugin
