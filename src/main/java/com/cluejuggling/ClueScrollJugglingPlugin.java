@@ -1,6 +1,8 @@
 package com.cluejuggling;
 
 import com.google.inject.Provides;
+import java.util.function.Predicate;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.ItemComposition;
@@ -30,7 +32,7 @@ import java.util.Map;
 import java.util.Set;
 
 @PluginDescriptor(
-	name = "Clue Juggling Timer",
+	name = "Clue Juggling Timers",
 	description = "clue despawn timers",
 	tags = {"clue", "juggling", "timer", "despawn"}
 )
@@ -73,7 +75,8 @@ public class ClueScrollJugglingPlugin extends Plugin
 	{
 		TileItem item = itemSpawned.getItem();
 		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
-		if (!itemComposition.getName().toLowerCase().contains("clue scroll")) return;
+		ClueTier clueTier = ClueTier.getClueTier(itemComposition.getName());
+		if (clueTier == null || !clueTier.showTimers(config)) return;
 		Tile tile = itemSpawned.getTile();
 
 		GroundItem.GroundItemKey groundItemKey = new GroundItem.GroundItemKey(item.getId(), tile.getWorldLocation());
@@ -86,32 +89,19 @@ public class ClueScrollJugglingPlugin extends Plugin
 				@Override
 				public Color getTextColor()
 				{
-//					Duration remaining = Duration.between(Instant.now(), this.getEndTime());
-//					float stage = remaining.toMillis() / 180_000f;
-//					int red1 = Color.RED.getRed();
-//					int red2 = Color.WHITE.getRed();
-//					int green1 = Color.RED.getGreen();
-//					int green2 = Color.WHITE.getGreen();
-//					int blue1 = Color.RED.getBlue();
-//					int blue2 = Color.WHITE.getBlue();
-//					int red = (int) (red1 + ((red2 - red1) * stage));
-//					int green = (int) (green1 + ((green2 - green1) * stage));
-//					int blue = (int) (blue1 + ((blue2 - blue1) * stage));
-//					return new Color(red, green, blue);
-					if (config.notificationTime() <= 180)
-					{
-						if (Duration.between(Instant.now(), this.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
-						{
-							return Color.RED;
-						}
-					}
-					return super.getTextColor();
+					return (showNotifications() && Duration.between(Instant.now(), this.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
+						? Color.RED
+						: super.getTextColor();
 				}
 			};
 			infoBoxManager.addInfoBox(timer);
 			alreadyNotified.remove(groundItemKey);
 			dropTimers.put(groundItemKey, timer);
 		}
+	}
+
+	private boolean showNotifications() {
+		return config.notificationTime() > 0;
 	}
 
 	@Subscribe
@@ -134,7 +124,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 		{
 			GroundItem.GroundItemKey groundItemKey = groundItemKeyTimerEntry.getKey();
 			Timer timer = groundItemKeyTimerEntry.getValue();
-			if (config.notificationTime() <= 180)
+			if (showNotifications())
 			{
 				if (Duration.between(Instant.now(), timer.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0 && !alreadyNotified.contains(groundItemKey))
 				{
@@ -158,4 +148,37 @@ public class ClueScrollJugglingPlugin extends Plugin
 	{
 		eventBus.unregister(groundItemPluginStuff);
 	}
+
+	@RequiredArgsConstructor
+	enum ClueTier
+	{
+		BEGINNER(config -> config.beginnerTimers()),
+		EASY(config -> config.easyTimers()),
+		MEDIUM(config -> config.mediumTimers()),
+		HARD(config -> config.hardTimers()),
+		ELITE(config -> config.eliteTimers()),
+		MASTER(config -> config.masterTimers())
+		;
+
+		private final Predicate<ClueScrollJugginglingConfig> showTimer;
+
+		public static ClueTier getClueTier(String clueName)
+		{
+			return
+				clueName.equals("Clue scroll (beginner)") ? ClueTier.BEGINNER :
+				clueName.equals("Clue scroll (easy)") ? ClueTier.EASY :
+				clueName.equals("Clue scroll (medium)") ? ClueTier.MEDIUM :
+				clueName.equals("Clue scroll (hard)") ? ClueTier.HARD :
+				clueName.equals("Clue scroll (elite)") ? ClueTier.ELITE :
+				clueName.equals("Clue scroll (master)") ? ClueTier.MASTER :
+				null
+				;
+		}
+
+		public boolean showTimers(ClueScrollJugginglingConfig config)
+		{
+			return showTimer.test(config);
+		}
+	}
+
 }
