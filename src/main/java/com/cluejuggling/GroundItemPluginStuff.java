@@ -218,7 +218,7 @@ public class GroundItemPluginStuff
 				return;
 			}
 
-			final Item clickedItem = inventory.getItem(menuOptionClicked.getSelectedItemIndex());
+			final Item clickedItem = inventory.getItem(plugin.client.getSelectedItemIndex());
 			if (clickedItem == null)
 			{
 				return;
