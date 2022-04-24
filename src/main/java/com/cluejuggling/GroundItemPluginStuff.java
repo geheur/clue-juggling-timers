@@ -35,6 +35,7 @@ import net.runelite.api.Tile;
 import net.runelite.api.TileItem;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.eventbus.Subscribe;
 
 import javax.inject.Inject;
@@ -203,28 +204,16 @@ public class GroundItemPluginStuff
 	@Subscribe
 	public void onMenuOptionClicked(MenuOptionClicked menuOptionClicked)
 	{
-		if (menuOptionClicked.getMenuAction() == MenuAction.ITEM_FIFTH_OPTION)
+		if (menuOptionClicked.isItemOp() && menuOptionClicked.getMenuOption().equals("Drop"))
 		{
-			int itemId = menuOptionClicked.getId();
+			int itemId = menuOptionClicked.getItemId();
 			// Keep a queue of recently dropped items to better detect
 			// item spawns that are drops
 			droppedItemQueue.add(itemId);
 		}
-		else if (menuOptionClicked.getMenuAction() == MenuAction.ITEM_USE_ON_GAME_OBJECT)
+		else if (menuOptionClicked.getMenuAction() == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT && plugin.client.getSelectedWidget().getId() == WidgetInfo.INVENTORY.getId())
 		{
-			final ItemContainer inventory = plugin.client.getItemContainer(InventoryID.INVENTORY);
-			if (inventory == null)
-			{
-				return;
-			}
-
-			final Item clickedItem = inventory.getItem(plugin.client.getSelectedItemIndex());
-			if (clickedItem == null)
-			{
-				return;
-			}
-
-			lastUsedItem = clickedItem.getId();
+			lastUsedItem = plugin.client.getSelectedWidget().getItemId();
 		}
 	}
 
