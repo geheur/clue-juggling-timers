@@ -1,2 +1,3 @@
-# Example
-An example greeter plugin
+# Clue Juggling Timer
+
+Timers for dropped clues.

@@ -24,14 +24,13 @@
  */
 package com.cluejuggling;
 
+import java.time.Instant;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Value;
 import net.runelite.api.coords.WorldPoint;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.time.Instant;
 
 @Data
 @Builder
