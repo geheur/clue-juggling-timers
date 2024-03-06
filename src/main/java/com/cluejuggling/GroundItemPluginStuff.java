@@ -26,31 +26,31 @@
 package com.cluejuggling;
 
 import com.google.common.collect.EvictingQueue;
-import net.runelite.api.InventoryID;
-import net.runelite.api.Item;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Queue;
+import javax.inject.Inject;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.Tile;
 import net.runelite.api.TileItem;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.MenuOptionClicked;
-import net.runelite.api.widgets.WidgetInfo;
+import net.runelite.api.widgets.ComponentID;
 import net.runelite.client.eventbus.Subscribe;
-
-import javax.inject.Inject;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Queue;
 
 /**
  * Bunch of stuff I copied over from GroundItemsPlugin
  */
 public class GroundItemPluginStuff
 {
+    // Unsure if the changes to clues in:
+    // https://secure.runescape.com/m=news/miscellaneous-quality-of-life-changes?oldschool=1
+    // affects the despawn timer within instances (1 hr instead of 30 minutes)
+    // This entire file might need reworked/updated anyway
 	private static final Duration DESPAWN_TIME_INSTANCE = Duration.ofMinutes(30);
 	private static final Duration DESPAWN_TIME_LOOT = Duration.ofMinutes(2);
-	private static final Duration DESPAWN_TIME_DROP = Duration.ofMinutes(3);
+	private static final Duration DESPAWN_TIME_DROP = Duration.ofMinutes(60);
 	private static final Duration DESPAWN_TIME_TABLE = Duration.ofMinutes(10);
 	private static final int KRAKEN_REGION = 9116;
 	private static final int KBD_NMZ_REGION = 9033;
@@ -211,7 +211,7 @@ public class GroundItemPluginStuff
 			// item spawns that are drops
 			droppedItemQueue.add(itemId);
 		}
-		else if (menuOptionClicked.getMenuAction() == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT && plugin.client.getSelectedWidget().getId() == WidgetInfo.INVENTORY.getId())
+		else if (menuOptionClicked.getMenuAction() == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT && plugin.client.getSelectedWidget().getId() == ComponentID.INVENTORY_CONTAINER)
 		{
 			lastUsedItem = plugin.client.getSelectedWidget().getItemId();
 		}

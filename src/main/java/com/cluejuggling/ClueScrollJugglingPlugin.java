@@ -1,7 +1,16 @@
 package com.cluejuggling;
 
 import com.google.inject.Provides;
+import java.awt.Color;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
+import javax.inject.Inject;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -21,16 +30,6 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.ui.overlay.infobox.Timer;
 
-import javax.inject.Inject;
-import java.awt.*;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 @PluginDescriptor(
 	name = "Clue Juggling Timers",
 	description = "clue despawn timers",
@@ -46,7 +45,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	ItemManager itemManager;
 
 	@Inject
-	private ClueScrollJugginglingConfig config;
+	private ClueScrollJugglingConfig config;
 
 	@Inject
 	private InfoBoxManager infoBoxManager;
@@ -66,8 +65,8 @@ public class ClueScrollJugglingPlugin extends Plugin
 	private Set<GroundItem.GroundItemKey> alreadyNotified = new HashSet<>();
 
 	@Provides
-	public ClueScrollJugginglingConfig getConfig(ConfigManager configManager) {
-		return configManager.getConfig(ClueScrollJugginglingConfig.class);
+	public ClueScrollJugglingConfig getConfig(ConfigManager configManager) {
+		return configManager.getConfig(ClueScrollJugglingConfig.class);
 	}
 
 	@Subscribe
@@ -93,6 +92,14 @@ public class ClueScrollJugglingPlugin extends Plugin
 						? Color.RED
 						: super.getTextColor();
 				}
+
+                @Override
+                public String getText() {
+                    long remainingMinutes = Duration.between(Instant.now(), this.getEndTime()).toMinutes();
+                    return remainingMinutes >= 10
+                        ? String.format("%dm", remainingMinutes)
+                        : super.getText();
+                }
 			};
 			infoBoxManager.addInfoBox(timer);
 			alreadyNotified.remove(groundItemKey);
@@ -160,7 +167,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 		MASTER(config -> config.masterTimers())
 		;
 
-		private final Predicate<ClueScrollJugginglingConfig> showTimer;
+		private final Predicate<ClueScrollJugglingConfig> showTimer;
 
 		public static ClueTier getClueTier(String clueName)
 		{
@@ -175,7 +182,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 				;
 		}
 
-		public boolean showTimers(ClueScrollJugginglingConfig config)
+		public boolean showTimers(ClueScrollJugglingConfig config)
 		{
 			return showTimer.test(config);
 		}
