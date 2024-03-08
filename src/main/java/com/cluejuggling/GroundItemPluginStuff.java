@@ -35,6 +35,7 @@ import net.runelite.api.Tile;
 import net.runelite.api.TileItem;
 import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.MenuOptionClicked;
+import net.runelite.api.widgets.ComponentID;
 import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.eventbus.Subscribe;
 
@@ -211,7 +212,7 @@ public class GroundItemPluginStuff
 			// item spawns that are drops
 			droppedItemQueue.add(itemId);
 		}
-		else if (menuOptionClicked.getMenuAction() == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT && plugin.client.getSelectedWidget().getId() == WidgetInfo.INVENTORY.getId())
+		else if (menuOptionClicked.getMenuAction() == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT && plugin.client.getSelectedWidget().getId() == ComponentID.INVENTORY_CONTAINER)
 		{
 			lastUsedItem = plugin.client.getSelectedWidget().getItemId();
 		}
