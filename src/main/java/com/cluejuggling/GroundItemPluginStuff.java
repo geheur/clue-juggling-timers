@@ -50,7 +50,7 @@ public class GroundItemPluginStuff
 {
 	private static final Duration DESPAWN_TIME_INSTANCE = Duration.ofMinutes(30);
 	private static final Duration DESPAWN_TIME_LOOT = Duration.ofMinutes(2);
-	private static final Duration DESPAWN_TIME_DROP = Duration.ofMinutes(3);
+	private static final Duration DESPAWN_TIME_DROP = Duration.ofMinutes(60);
 	private static final Duration DESPAWN_TIME_TABLE = Duration.ofMinutes(10);
 	private static final int KRAKEN_REGION = 9116;
 	private static final int KBD_NMZ_REGION = 9033;

@@ -93,6 +93,14 @@ public class ClueScrollJugglingPlugin extends Plugin
 						? Color.RED
 						: super.getTextColor();
 				}
+
+                @Override
+                public String getText() {
+                    long remainingMinutes = Duration.between(Instant.now(), this.getEndTime()).toMinutes();
+                    return remainingMinutes >= 10
+                        ? String.format("%dm", remainingMinutes)
+                        : super.getText();
+                }
 			};
 			infoBoxManager.addInfoBox(timer);
 			alreadyNotified.remove(groundItemKey);
