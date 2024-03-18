@@ -4,7 +4,7 @@ import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 
-@ConfigGroup("cluescrolljuggling")
+@ConfigGroup(ClueScrollJugglingPlugin.CONFIG_GROUP)
 public interface ClueScrollJugginglingConfig extends Config
 {
 	@ConfigItem(

@@ -1,35 +1,40 @@
 package com.cluejuggling;
 
+import com.cluejuggling.GroundItem.GroundItemKey;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.google.inject.Provides;
+import java.awt.Color;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Predicate;
+import javax.inject.Inject;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.Tile;
 import net.runelite.api.TileItem;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemDespawned;
 import net.runelite.api.events.ItemSpawned;
 import net.runelite.client.Notifier;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ClientShutdown;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.ui.overlay.infobox.Timer;
-
-import javax.inject.Inject;
-import java.awt.*;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 
 @PluginDescriptor(
 	name = "Clue Juggling Timers",
@@ -39,6 +44,8 @@ import java.util.Set;
 @Slf4j
 public class ClueScrollJugglingPlugin extends Plugin
 {
+	public static final String CONFIG_GROUP = "cluescrolljuggling";
+
 	@Inject
 	Client client;
 
@@ -60,10 +67,99 @@ public class ClueScrollJugglingPlugin extends Plugin
 	@Inject
 	private Notifier notifier;
 
+	@Inject private Gson gson;
+
 	private GroundItemPluginStuff groundItemPluginStuff = new GroundItemPluginStuff(this);
 
-	public Map<GroundItem.GroundItemKey, Timer> dropTimers = new HashMap<>();
-	private Set<GroundItem.GroundItemKey> alreadyNotified = new HashSet<>();
+	private List<DroppedClue> droppedClues = new ArrayList<>();
+
+	@Data
+	public static final class DroppedClue
+	{
+		public DroppedClue(Instant startTime, int timeRemaining, GroundItemKey groundItemKey) {
+			this.startTime = startTime;
+			this.timeRemaining = timeRemaining;
+			this.groundItemKey = groundItemKey;
+		}
+
+		transient Instant startTime;
+		int timeRemaining;
+		final GroundItemKey groundItemKey;
+		boolean notified = false;
+		transient boolean invalidTimer = false;
+
+		transient Timer infobox = null;
+	}
+
+	private void onLogin() {
+//		System.out.println("login " + Thread.currentThread().getName());
+
+		Boolean timesAreAccurate = configManager.getRSProfileConfiguration(CONFIG_GROUP, "timesAreAccurate", Boolean.class);
+		if (timesAreAccurate == null) timesAreAccurate = false;
+		configManager.setRSProfileConfiguration(CONFIG_GROUP, "timesAreAccurate", false);
+
+		droppedClues = gson.fromJson(configManager.getRSProfileConfiguration(CONFIG_GROUP, "clueData"), new TypeToken<List<DroppedClue>>(){}.getType());
+//		System.out.println("   dropped clues is " + droppedClues);
+		if (droppedClues == null) droppedClues = new ArrayList<>();
+		// Unfortunately, varc 526 (play time) is not sent unless the tab that shows it is selected.
+		for (DroppedClue droppedClue : droppedClues)
+		{
+			droppedClue.startTime = Instant.now();
+			if (!timesAreAccurate) droppedClue.invalidTimer = true;
+			addInfobox(droppedClue);
+		}
+	}
+
+	private void onLogout() {
+//		System.out.println("logout " + Thread.currentThread().getName());
+		if (droppedClues.isEmpty()) return;
+
+		for (DroppedClue droppedClue : droppedClues)
+		{
+			droppedClue.timeRemaining -= Duration.between(droppedClue.startTime, Instant.now()).getSeconds();
+		}
+		saveDroppedClues();
+		configManager.setRSProfileConfiguration(CONFIG_GROUP, "timesAreAccurate", true);
+//		configManager.setRSProfileConfiguration(CONFIG_GROUP, "jagexPlayTime", client.getVarcIntValue(526));
+
+		for (DroppedClue droppedClue : droppedClues)
+		{
+			infoBoxManager.removeInfoBox(droppedClue.infobox);
+		}
+		droppedClues.clear();
+	}
+
+	private int lastGameState = 0;
+	@Subscribe
+	public void onGameStateChanged(GameStateChanged e) {
+//		System.out.println("game state changed from " + lastGameState + " to " + e.getGameState());
+		if (e.getGameState() == GameState.LOADING) return;
+
+		int LOGGED_IN_STATE = GameState.LOGGED_IN.getState();
+		int state = e.getGameState().getState();
+		boolean loggedOut = state < LOGGED_IN_STATE;
+		boolean loggedIn = state >= LOGGED_IN_STATE;
+		boolean wasLoggedOut = lastGameState < LOGGED_IN_STATE;
+		boolean wasLoggedIn = lastGameState >= LOGGED_IN_STATE;
+		if (wasLoggedOut && loggedIn) {
+			onLogin();
+		} else if (wasLoggedIn && loggedOut) {
+			onLogout();
+		}
+		lastGameState = e.getGameState().getState();
+	}
+
+	@Inject private ClientThread clientThread;
+
+	@Subscribe
+	public void onClientShutdown(ClientShutdown e) {
+//		System.out.println("client shutdown");
+		clientThread.invokeLater(() -> {
+			GameStateChanged gameStateChanged = new GameStateChanged();
+			gameStateChanged.setGameState(GameState.LOGIN_SCREEN);
+			this.onGameStateChanged(gameStateChanged);
+		});
+	}
 
 	@Provides
 	public ClueScrollJugginglingConfig getConfig(ConfigManager configManager) {
@@ -79,33 +175,58 @@ public class ClueScrollJugglingPlugin extends Plugin
 		if (clueTier == null || !clueTier.showTimers(config)) return;
 		Tile tile = itemSpawned.getTile();
 
-		GroundItem.GroundItemKey groundItemKey = new GroundItem.GroundItemKey(item.getId(), tile.getWorldLocation());
+		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), tile.getWorldLocation());
 
-		if (!dropTimers.containsKey(groundItemKey)) {
+		if (getDroppedClue(groundItemKey) == null) {
 			Instant instant = groundItemPluginStuff.calculateDespawnTime(groundItemPluginStuff.buildGroundItem(tile, item));
-			instant.compareTo(Instant.now());
+			if (instant == null) return;
 			Duration between = Duration.between(Instant.now(), instant);
-			Timer timer = new Timer(between.getSeconds(), ChronoUnit.SECONDS, itemManager.getImage(item.getId()), this) {
-				@Override
-				public Color getTextColor()
-				{
-					return (showNotifications() && Duration.between(Instant.now(), this.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
-						? Color.RED
-						: super.getTextColor();
-				}
-
-                @Override
-                public String getText() {
-                    long remainingMinutes = Duration.between(Instant.now(), this.getEndTime()).toMinutes();
-                    return remainingMinutes >= 10
-                        ? String.format("%dm", remainingMinutes)
-                        : super.getText();
-                }
-			};
-			infoBoxManager.addInfoBox(timer);
-			alreadyNotified.remove(groundItemKey);
-			dropTimers.put(groundItemKey, timer);
+			DroppedClue droppedClue = new DroppedClue(Instant.now(), (int) between.getSeconds(), groundItemKey);
+			droppedClues.add(droppedClue);
+			saveDroppedClues();
+			addInfobox(droppedClue);
 		}
+	}
+
+	private void saveDroppedClues()
+	{
+//		System.out.println("saving clues: " + gson.toJson(droppedClues));
+		configManager.setRSProfileConfiguration(CONFIG_GROUP, "clueData", gson.toJson(droppedClues));
+	}
+
+	private DroppedClue getDroppedClue(GroundItemKey groundItemKey)
+	{
+		for (DroppedClue droppedClue : droppedClues)
+		{
+			if (droppedClue.groundItemKey.equals(groundItemKey)) {
+				return droppedClue;
+			}
+		}
+		return null;
+	}
+
+	private void addInfobox(DroppedClue droppedClue)
+	{
+		Timer timer = new Timer(droppedClue.timeRemaining, ChronoUnit.SECONDS, itemManager.getImage(droppedClue.groundItemKey.getItemId()), this) {
+			@Override
+			public Color getTextColor()
+			{
+				return (droppedClue.invalidTimer || showNotifications() && Duration.between(Instant.now(), this.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
+					? Color.RED
+					: super.getTextColor();
+			}
+
+			@Override
+			public String getText() {
+				if (droppedClue.invalidTimer) return "?";
+				long remainingMinutes = Duration.between(Instant.now(), this.getEndTime()).toMinutes();
+				return remainingMinutes >= 10
+					? String.format("%dm", remainingMinutes)
+					: super.getText();
+			}
+		};
+		infoBoxManager.addInfoBox(timer);
+		droppedClue.infobox = timer;
 	}
 
 	private boolean showNotifications() {
@@ -117,28 +238,29 @@ public class ClueScrollJugglingPlugin extends Plugin
 	{
 		TileItem item = itemDespawned.getItem();
 		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
-		if (!itemComposition.getName().toLowerCase().contains("clue scroll")) return;
+		if (!itemComposition.getName().toLowerCase().startsWith("clue scroll")) return;
 		Tile tile = itemDespawned.getTile();
 
-		GroundItem.GroundItemKey groundItemKey = new GroundItem.GroundItemKey(item.getId(), tile.getWorldLocation());
+		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), tile.getWorldLocation());
 
-		Timer removedTimer = dropTimers.remove(groundItemKey);
-		infoBoxManager.removeInfoBox(removedTimer);
+		DroppedClue droppedClue = getDroppedClue(groundItemKey);
+		droppedClues.remove(droppedClue);
+		saveDroppedClues();
+		if (droppedClue != null) {
+			infoBoxManager.removeInfoBox(droppedClue.infobox);
+		}
 	}
 
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
-		for (Map.Entry<GroundItem.GroundItemKey, Timer> groundItemKeyTimerEntry : dropTimers.entrySet())
+		if (showNotifications())
 		{
-			GroundItem.GroundItemKey groundItemKey = groundItemKeyTimerEntry.getKey();
-			Timer timer = groundItemKeyTimerEntry.getValue();
-			if (showNotifications())
+			for (DroppedClue droppedClue : droppedClues)
 			{
-				if (Duration.between(Instant.now(), timer.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0 && !alreadyNotified.contains(groundItemKey))
+				if (!droppedClue.notified && Duration.between(Instant.now(), droppedClue.infobox.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
 				{
-					timer.getTextColor();
 					notifier.notify("Your clue scroll is about to disappear!");
-					alreadyNotified.add(groundItemKey);
+					droppedClue.notified = true;
 				}
 			}
 		}
@@ -188,5 +310,4 @@ public class ClueScrollJugglingPlugin extends Plugin
 			return showTimer.test(config);
 		}
 	}
-
 }
