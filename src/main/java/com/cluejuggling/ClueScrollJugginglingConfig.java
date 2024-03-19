@@ -98,4 +98,15 @@ public interface ClueScrollJugginglingConfig extends Config
 	{
 		return 59;
 	}
+
+	@ConfigItem(
+		keyName = "combineTimers",
+		name = "Combine infoboxes",
+		description = "Show only 1 infobox, with the lowest time remaining.",
+		position = 8
+	)
+	default boolean combineTimers()
+	{
+		return false;
+	}
 }

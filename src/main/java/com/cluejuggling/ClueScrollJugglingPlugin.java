@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.ItemID;
 import net.runelite.api.Tile;
 import net.runelite.api.TileItem;
 import net.runelite.api.events.GameStateChanged;
@@ -30,6 +31,7 @@ import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
@@ -72,6 +74,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	private GroundItemPluginStuff groundItemPluginStuff = new GroundItemPluginStuff(this);
 
 	private List<DroppedClue> droppedClues = new ArrayList<>();
+	private Timer combinedTimer = null;
 
 	@Data
 	public static final class DroppedClue
@@ -90,11 +93,12 @@ public class ClueScrollJugglingPlugin extends Plugin
 		transient boolean invalidTimer = false;
 		boolean droppedByPlayer;
 
-		transient Timer infobox = null;
+		transient Timer infobox = null; // if it exists
 
 		public Duration getDuration(int dropTime)
 		{
-			return Duration.between(Instant.now(), infobox.getEndTime()).plus(Duration.ofMinutes(droppedByPlayer ? dropTime - 60 : 0));
+			return Duration.between(Instant.now(), startTime.plus(Duration.ofSeconds(timeRemaining)))
+				.plus(Duration.ofMinutes(droppedByPlayer ? dropTime - 60 : 0));
 		}
 	}
 
@@ -133,6 +137,8 @@ public class ClueScrollJugglingPlugin extends Plugin
 		{
 			infoBoxManager.removeInfoBox(droppedClue.infobox);
 		}
+		infoBoxManager.removeInfoBox(combinedTimer);
+		combinedTimer = null;
 		droppedClues.clear();
 	}
 
@@ -166,6 +172,28 @@ public class ClueScrollJugglingPlugin extends Plugin
 			gameStateChanged.setGameState(GameState.LOGIN_SCREEN);
 			this.onGameStateChanged(gameStateChanged);
 		});
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged e) {
+		if (e.getGroup().equals(CONFIG_GROUP) && e.getKey().equals("combineTimers")) {
+			clientThread.invokeLater(() -> {
+				if (config.combineTimers()) {
+					for (DroppedClue droppedClue : droppedClues)
+					{
+						infoBoxManager.removeInfoBox(droppedClue.infobox);
+						addInfobox(droppedClue);
+					}
+				} else {
+					infoBoxManager.removeInfoBox(combinedTimer);
+					combinedTimer = null;
+					for (DroppedClue droppedClue : droppedClues)
+					{
+						addInfobox(droppedClue);
+					}
+				}
+			});
+		}
 	}
 
 	@Provides
@@ -215,41 +243,82 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 	private void addInfobox(DroppedClue droppedClue)
 	{
-		Timer timer = new Timer(droppedClue.timeRemaining, ChronoUnit.SECONDS, itemManager.getImage(droppedClue.groundItemKey.getItemId()), this) {
-			@Override
-			public Color getTextColor()
+		if (config.combineTimers() && droppedClues.size() > 1) {
+			if (combinedTimer == null) {
+				for (DroppedClue clue : droppedClues)
+				{
+					infoBoxManager.removeInfoBox(clue.infobox);
+				}
+				combinedTimer = new Timer(droppedClue.timeRemaining, ChronoUnit.SECONDS, itemManager.getImage(23814), this) {
+					@Override
+					public Color getTextColor()
+					{
+						for (DroppedClue clue : droppedClues)
+						{
+							if (clue.invalidTimer || clue.notified) return Color.RED;
+						}
+						return super.getTextColor();
+					}
+
+					@Override
+					public String getText() {
+						if (droppedClues.isEmpty()) return "none";
+
+						DroppedClue lowestTimeClue = null;
+						int lowestTime = Integer.MAX_VALUE;
+						for (DroppedClue clue : droppedClues)
+						{
+							if (clue.invalidTimer) return "?";
+							int time = (int) clue.getDuration(config.hourDropTimer()).getSeconds();
+							if (time < lowestTime) {
+								lowestTime = time;
+								lowestTimeClue = clue;
+							}
+						}
+
+						Duration timeLeft = lowestTimeClue.getDuration(config.hourDropTimer());
+						long remainingMinutes = timeLeft.toMinutes();
+						return remainingMinutes >= 10
+							? String.format("%dm", remainingMinutes)
+							: formatWithSeconds(timeLeft);
+					}
+				};
+				infoBoxManager.addInfoBox(combinedTimer);
+			}
+		} else {
+			Timer timer = new Timer(droppedClue.timeRemaining, ChronoUnit.SECONDS, itemManager.getImage(droppedClue.groundItemKey.getItemId()), this)
 			{
-				return (
-						droppedClue.invalidTimer ||
-						droppedClue.notified ||
-							showNotifications() &&
-							droppedClue.getDuration(config.hourDropTimer()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0
-				)
-					? Color.RED
-					: super.getTextColor();
-			}
+				@Override
+				public Color getTextColor()
+				{
+					return (droppedClue.invalidTimer || droppedClue.notified)
+						? Color.RED
+						: super.getTextColor();
+				}
 
-			@Override
-			public String getText() {
-				if (droppedClue.invalidTimer) return "?";
-				Duration timeLeft = droppedClue.getDuration(config.hourDropTimer());
-				long remainingMinutes = timeLeft.toMinutes();
-				return remainingMinutes >= 10
-					? String.format("%dm", remainingMinutes)
-					: formatWithSeconds(timeLeft);
-			}
+				@Override
+				public String getText()
+				{
+					if (droppedClue.invalidTimer) return "?";
+					Duration timeLeft = droppedClue.getDuration(config.hourDropTimer());
+					long remainingMinutes = timeLeft.toMinutes();
+					return remainingMinutes >= 10
+						? String.format("%dm", remainingMinutes)
+						: formatWithSeconds(timeLeft);
+				}
+			};
+			infoBoxManager.addInfoBox(timer);
+			droppedClue.infobox = timer;
+		}
+	}
 
-			private String formatWithSeconds(Duration timeLeft) {
-				int seconds = (int) (timeLeft.toMillis() / 1000L);
+	private String formatWithSeconds(Duration timeLeft) {
+		int seconds = (int) (timeLeft.toMillis() / 1000L);
 
-				int minutes = (seconds % 3600) / 60;
-				int secs = seconds % 60;
+		int minutes = (seconds % 3600) / 60;
+		int secs = seconds % 60;
 
-				return String.format("%d:%02d", minutes, secs);
-			}
-		};
-		infoBoxManager.addInfoBox(timer);
-		droppedClue.infobox = timer;
+		return String.format("%d:%02d", minutes, secs);
 	}
 
 	private boolean showNotifications() {
@@ -267,10 +336,20 @@ public class ClueScrollJugglingPlugin extends Plugin
 		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), tile.getWorldLocation());
 
 		DroppedClue droppedClue = getDroppedClue(groundItemKey);
-		droppedClues.remove(droppedClue);
-		saveDroppedClues();
 		if (droppedClue != null) {
-			infoBoxManager.removeInfoBox(droppedClue.infobox);
+			droppedClues.remove(droppedClue);
+			saveDroppedClues();
+			if (droppedClue.infobox != null) {
+				infoBoxManager.removeInfoBox(droppedClue.infobox);
+			}
+			if (combinedTimer != null && droppedClues.size() <= 1)
+			{
+				infoBoxManager.removeInfoBox(combinedTimer);
+				combinedTimer = null;
+				if (droppedClues.size() == 1) {
+					addInfobox(droppedClues.get(0));
+				}
+			}
 		}
 	}
 
