@@ -76,10 +76,11 @@ public class ClueScrollJugglingPlugin extends Plugin
 	@Data
 	public static final class DroppedClue
 	{
-		public DroppedClue(Instant startTime, int timeRemaining, GroundItemKey groundItemKey) {
+		public DroppedClue(Instant startTime, int timeRemaining, GroundItemKey groundItemKey, boolean droppedByPlayer) {
 			this.startTime = startTime;
 			this.timeRemaining = timeRemaining;
 			this.groundItemKey = groundItemKey;
+			this.droppedByPlayer = droppedByPlayer;
 		}
 
 		transient Instant startTime;
@@ -87,8 +88,14 @@ public class ClueScrollJugglingPlugin extends Plugin
 		final GroundItemKey groundItemKey;
 		boolean notified = false;
 		transient boolean invalidTimer = false;
+		boolean droppedByPlayer;
 
 		transient Timer infobox = null;
+
+		public Duration getDuration(int dropTime)
+		{
+			return Duration.between(Instant.now(), infobox.getEndTime()).plus(Duration.ofMinutes(droppedByPlayer ? dropTime - 60 : 0));
+		}
 	}
 
 	private void onLogin() {
@@ -178,10 +185,11 @@ public class ClueScrollJugglingPlugin extends Plugin
 		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), tile.getWorldLocation());
 
 		if (getDroppedClue(groundItemKey) == null) {
-			Instant instant = groundItemPluginStuff.calculateDespawnTime(groundItemPluginStuff.buildGroundItem(tile, item));
+			GroundItem groundItem = groundItemPluginStuff.buildGroundItem(tile, item);
+			Instant instant = groundItemPluginStuff.calculateDespawnTime(groundItem);
 			if (instant == null) return;
 			Duration between = Duration.between(Instant.now(), instant);
-			DroppedClue droppedClue = new DroppedClue(Instant.now(), (int) between.getSeconds(), groundItemKey);
+			DroppedClue droppedClue = new DroppedClue(Instant.now(), (int) between.getSeconds(), groundItemKey, groundItem.getLootType() == LootType.DROPPED);
 			droppedClues.add(droppedClue);
 			saveDroppedClues();
 			addInfobox(droppedClue);
@@ -211,7 +219,12 @@ public class ClueScrollJugglingPlugin extends Plugin
 			@Override
 			public Color getTextColor()
 			{
-				return (droppedClue.invalidTimer || showNotifications() && Duration.between(Instant.now(), this.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
+				return (
+						droppedClue.invalidTimer ||
+						droppedClue.notified ||
+							showNotifications() &&
+							droppedClue.getDuration(config.hourDropTimer()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0
+				)
 					? Color.RED
 					: super.getTextColor();
 			}
@@ -219,10 +232,20 @@ public class ClueScrollJugglingPlugin extends Plugin
 			@Override
 			public String getText() {
 				if (droppedClue.invalidTimer) return "?";
-				long remainingMinutes = Duration.between(Instant.now(), this.getEndTime()).toMinutes();
+				Duration timeLeft = droppedClue.getDuration(config.hourDropTimer());
+				long remainingMinutes = timeLeft.toMinutes();
 				return remainingMinutes >= 10
 					? String.format("%dm", remainingMinutes)
-					: super.getText();
+					: formatWithSeconds(timeLeft);
+			}
+
+			private String formatWithSeconds(Duration timeLeft) {
+				int seconds = (int) (timeLeft.toMillis() / 1000L);
+
+				int minutes = (seconds % 3600) / 60;
+				int secs = seconds % 60;
+
+				return String.format("%d:%02d", minutes, secs);
 			}
 		};
 		infoBoxManager.addInfoBox(timer);
@@ -253,11 +276,11 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
-		if (showNotifications())
+		if (!droppedClues.isEmpty() && showNotifications())
 		{
 			for (DroppedClue droppedClue : droppedClues)
 			{
-				if (!droppedClue.notified && Duration.between(Instant.now(), droppedClue.infobox.getEndTime()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
+				if (!droppedClue.notified && droppedClue.getDuration(config.hourDropTimer()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
 				{
 					notifier.notify("Your clue scroll is about to disappear!");
 					droppedClue.notified = true;

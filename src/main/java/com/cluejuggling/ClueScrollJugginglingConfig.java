@@ -3,6 +3,8 @@ package com.cluejuggling;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Range;
+import net.runelite.client.config.Units;
 
 @ConfigGroup(ClueScrollJugglingPlugin.CONFIG_GROUP)
 public interface ClueScrollJugginglingConfig extends Config
@@ -82,5 +84,18 @@ public interface ClueScrollJugginglingConfig extends Config
 	default boolean masterTimers()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+		keyName = "hourDropTimer",
+		name = "Clue drop time",
+		description = "It is 60 minutes, but you might want to use a lower number due to inaccuracies in this plugin's tracking.",
+		position = 7
+	)
+	@Units(Units.MINUTES)
+	@Range(max=60)
+	default int hourDropTimer()
+	{
+		return 59;
 	}
 }
