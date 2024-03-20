@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.function.Predicate;
 import javax.inject.Inject;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -85,7 +84,6 @@ public class ClueScrollJugglingPlugin extends Plugin
 	private InfoBox combinedTimer = null;
 
 	@Data
-	@EqualsAndHashCode(exclude={"notified"})
 	public static final class DroppedClue
 	{
 		public DroppedClue(Instant startTime, int timeRemaining, GroundItemKey groundItemKey, boolean droppedByPlayer) {
