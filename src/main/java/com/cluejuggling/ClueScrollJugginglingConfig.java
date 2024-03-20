@@ -109,4 +109,14 @@ public interface ClueScrollJugginglingConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+		keyName = "hidden",
+		name = "<html>Shift-right-click the infoboxes for more options.</html>",
+		description = "",
+		position = 9
+	)
+	default void shiftRightClickInfo()
+	{
+	}
 }

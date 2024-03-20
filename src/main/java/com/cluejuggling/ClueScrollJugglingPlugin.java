@@ -13,18 +13,22 @@ import java.util.List;
 import java.util.function.Predicate;
 import javax.inject.Inject;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
-import net.runelite.api.ItemID;
+import net.runelite.api.MenuAction;
+import net.runelite.api.MenuEntry;
 import net.runelite.api.Tile;
 import net.runelite.api.TileItem;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemDespawned;
 import net.runelite.api.events.ItemSpawned;
+import net.runelite.api.events.MenuOpened;
 import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
@@ -35,8 +39,12 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
 import net.runelite.client.ui.overlay.infobox.Timer;
+import net.runelite.client.util.ColorUtil;
+import net.runelite.client.util.Text;
+import org.apache.commons.lang3.ArrayUtils;
 
 @PluginDescriptor(
 	name = "Clue Juggling Timers",
@@ -77,6 +85,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	private Timer combinedTimer = null;
 
 	@Data
+	@EqualsAndHashCode(exclude={"notified"})
 	public static final class DroppedClue
 	{
 		public DroppedClue(Instant startTime, int timeRemaining, GroundItemKey groundItemKey, boolean droppedByPlayer) {
@@ -92,6 +101,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 		boolean notified = false;
 		transient boolean invalidTimer = false;
 		boolean droppedByPlayer;
+		ClueTier tier;
 
 		transient Timer infobox = null; // if it exists
 
@@ -206,7 +216,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	{
 		TileItem item = itemSpawned.getItem();
 		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
-		ClueTier clueTier = ClueTier.getClueTier(itemComposition.getName());
+		ClueTier clueTier = ClueTier.getClueTier(itemComposition.getMembersName());
 		if (clueTier == null || !clueTier.showTimers(config)) return;
 		Tile tile = itemSpawned.getTile();
 
@@ -284,6 +294,9 @@ public class ClueScrollJugglingPlugin extends Plugin
 					}
 				};
 				infoBoxManager.addInfoBox(combinedTimer);
+				List<OverlayMenuEntry> menuEntries = combinedTimer.getMenuEntries();
+				menuEntries.add(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY, "infobox jank", "clue scroll combined"));
+				combinedTimer.setMenuEntries(menuEntries);
 			}
 		} else {
 			Timer timer = new Timer(droppedClue.timeRemaining, ChronoUnit.SECONDS, itemManager.getImage(droppedClue.groundItemKey.getItemId()), this)
@@ -308,8 +321,47 @@ public class ClueScrollJugglingPlugin extends Plugin
 				}
 			};
 			infoBoxManager.addInfoBox(timer);
+			List<OverlayMenuEntry> menuEntries = timer.getMenuEntries();
+			menuEntries.add(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY, "infobox jank", "" + droppedClues.indexOf(droppedClue)));
+			timer.setMenuEntries(menuEntries);
 			droppedClue.infobox = timer;
 		}
+	}
+
+	@Subscribe
+	public void onMenuOpened(MenuOpened e) {
+		MenuEntry[] menuEntries = client.getMenuEntries();
+		for (int i = 0; i < menuEntries.length; i++)
+		{
+			MenuEntry menuEntry = menuEntries[i];
+			if (menuEntry.getType() == MenuAction.RUNELITE_OVERLAY && menuEntry.getOption().equals("infobox jank")) {
+				if (menuEntry.getTarget().contains("clue scroll combined"))
+				{
+					menuEntry.setOption("Clue timers");
+					menuEntry.setTarget("(" + droppedClues.size() + ")");
+					for (int i1 = 0; i1 < droppedClues.size(); i1++)
+					{
+						DroppedClue droppedClue = droppedClues.get(i1);
+						addClueMenuEntries(i, droppedClue, "clue " + i1);
+					}
+				} else {
+					DroppedClue droppedClue = droppedClues.get(Integer.parseInt(Text.removeTags(menuEntry.getTarget())));
+					addClueMenuEntries(i, droppedClue, "clue");
+					client.setMenuEntries(ArrayUtils.remove(client.getMenuEntries(), i + 2));
+				}
+				break;
+			}
+		}
+	}
+
+	private void addClueMenuEntries(int index, DroppedClue droppedClue, String target)
+	{
+		ClueTier clueTier = ClueTier.getClueTier(itemManager.getItemComposition(droppedClue.groundItemKey.getItemId()).getMembersName());
+		client.createMenuEntry(index).setOption("| " + clueTier.getColoredName()).setTarget(formatWithSeconds(droppedClue.getDuration(config.hourDropTimer())));
+		client.createMenuEntry(index).setOption("|     Remove").setTarget(target).onClick(e1 -> {
+			removeInfoBox(droppedClue);
+		});
+//		client.createMenuEntry(i).setOption("   ").setTarget(droppedClue.groundItemKey.getLocation().toString());
 	}
 
 	private String formatWithSeconds(Duration timeLeft) {
@@ -337,18 +389,23 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 		DroppedClue droppedClue = getDroppedClue(groundItemKey);
 		if (droppedClue != null) {
-			droppedClues.remove(droppedClue);
-			saveDroppedClues();
-			if (droppedClue.infobox != null) {
-				infoBoxManager.removeInfoBox(droppedClue.infobox);
-			}
-			if (combinedTimer != null && droppedClues.size() <= 1)
-			{
-				infoBoxManager.removeInfoBox(combinedTimer);
-				combinedTimer = null;
-				if (droppedClues.size() == 1) {
-					addInfobox(droppedClues.get(0));
-				}
+			removeInfoBox(droppedClue);
+		}
+	}
+
+	private void removeInfoBox(DroppedClue droppedClue)
+	{
+		droppedClues.remove(droppedClue);
+		saveDroppedClues();
+		if (droppedClue.infobox != null) {
+			infoBoxManager.removeInfoBox(droppedClue.infobox);
+		}
+		if (combinedTimer != null && droppedClues.size() <= 1)
+		{
+			infoBoxManager.removeInfoBox(combinedTimer);
+			combinedTimer = null;
+			if (droppedClues.size() == 1) {
+				addInfobox(droppedClues.get(0));
 			}
 		}
 	}
@@ -384,15 +441,17 @@ public class ClueScrollJugglingPlugin extends Plugin
 	@RequiredArgsConstructor
 	enum ClueTier
 	{
-		BEGINNER(config -> config.beginnerTimers()),
-		EASY(config -> config.easyTimers()),
-		MEDIUM(config -> config.mediumTimers()),
-		HARD(config -> config.hardTimers()),
-		ELITE(config -> config.eliteTimers()),
-		MASTER(config -> config.masterTimers())
+		BEGINNER(config -> config.beginnerTimers(), ColorUtil.wrapWithColorTag("Beginner", Color.decode("#cdd19b"))),
+		EASY(config -> config.easyTimers(), ColorUtil.wrapWithColorTag("Easy", Color.decode("#2d9928"))),
+		MEDIUM(config -> config.mediumTimers(), ColorUtil.wrapWithColorTag("Medium", Color.decode("#48c26f"))),
+		HARD(config -> config.hardTimers(), ColorUtil.wrapWithColorTag("Hard", Color.decode("#7627ab"))),
+		ELITE(config -> config.eliteTimers(), ColorUtil.wrapWithColorTag("Elite", Color.decode("#9da836"))),
+		MASTER(config -> config.masterTimers(), ColorUtil.wrapWithColorTag("Master", Color.decode("#96421b")))
 		;
 
 		private final Predicate<ClueScrollJugginglingConfig> showTimer;
+		@Getter
+		public final String coloredName;
 
 		public static ClueTier getClueTier(String clueName)
 		{
