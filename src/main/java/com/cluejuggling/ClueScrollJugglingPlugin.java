@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.ItemID;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Tile;
@@ -512,6 +513,22 @@ public class ClueScrollJugglingPlugin extends Plugin
 			{
 				removeInfoBox(droppedClue);
 			}
+		}
+		if (e.getCommand().equals("cluetimertest")) {
+			String[] args = e.getArguments();
+			int itemId = args.length < 1 || args[0].equals("beginner") ? ItemID.CLUE_SCROLL_BEGINNER :
+				args[0].equals("easy") ? ItemID.CLUE_SCROLL_EASY :
+				args[0].equals("medium") ? ItemID.CLUE_SCROLL_MEDIUM :
+				args[0].equals("hard") ? ItemID.CLUE_SCROLL_HARD :
+				args[0].equals("elite") ? ItemID.CLUE_SCROLL_ELITE :
+				ItemID.CLUE_SCROLL_MASTER;
+			DroppedClue droppedClue = new DroppedClue(
+				Instant.now(),
+				args.length > 2 ? Integer.parseInt(args[2]) : 3600,
+				new GroundItemKey(itemId, client.getLocalPlayer().getWorldLocation()),
+				true);
+			droppedClues.add(droppedClue);
+			addInfobox(droppedClue);
 		}
 	}
 }
