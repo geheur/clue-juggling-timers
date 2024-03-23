@@ -112,7 +112,7 @@ public interface ClueScrollJugginglingConfig extends Config
 
 	@ConfigItem(
 		keyName = "hidden",
-		name = "<html>Shift-right-click the infoboxes for more options.</html>",
+		name = "<html>Shift-right-click the infoboxes for more options.<br>You can use the ::clearclues command to clear all infoboxes.</html>",
 		description = "",
 		position = 9
 	)

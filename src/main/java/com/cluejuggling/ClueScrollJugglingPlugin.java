@@ -23,6 +23,7 @@ import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.Tile;
 import net.runelite.api.TileItem;
+import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemDespawned;
@@ -492,6 +493,16 @@ public class ClueScrollJugglingPlugin extends Plugin
 		public boolean showTimers(ClueScrollJugginglingConfig config)
 		{
 			return showTimer.test(config);
+		}
+	}
+
+	@Subscribe
+	public void onCommandExecuted(CommandExecuted e) {
+		if (e.getCommand().equals("clearclues")) {
+			for (DroppedClue droppedClue : new ArrayList<>(droppedClues))
+			{
+				removeInfoBox(droppedClue);
+			}
 		}
 	}
 }
