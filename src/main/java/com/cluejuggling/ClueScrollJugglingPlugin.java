@@ -7,7 +7,6 @@ import com.google.inject.Provides;
 import java.awt.Color;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
@@ -40,8 +39,8 @@ import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
+import net.runelite.client.ui.overlay.infobox.InfoBox;
 import net.runelite.client.ui.overlay.infobox.InfoBoxManager;
-import net.runelite.client.ui.overlay.infobox.Timer;
 import net.runelite.client.util.ColorUtil;
 import net.runelite.client.util.Text;
 import org.apache.commons.lang3.ArrayUtils;
@@ -82,7 +81,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	private GroundItemPluginStuff groundItemPluginStuff = new GroundItemPluginStuff(this);
 
 	private List<DroppedClue> droppedClues = new ArrayList<>();
-	private Timer combinedTimer = null;
+	private InfoBox combinedTimer = null;
 
 	@Data
 	@EqualsAndHashCode(exclude={"notified"})
@@ -103,12 +102,17 @@ public class ClueScrollJugglingPlugin extends Plugin
 		boolean droppedByPlayer;
 		ClueTier tier;
 
-		transient Timer infobox = null; // if it exists
+		transient InfoBox infobox = null; // if it exists
 
 		public Duration getDuration(int dropTime)
 		{
 			return Duration.between(Instant.now(), startTime.plus(Duration.ofSeconds(timeRemaining)))
 				.plus(Duration.ofMinutes(droppedByPlayer ? dropTime - 60 : 0));
+		}
+
+		public boolean isExpired(int dropTime)
+		{
+			return getDuration(dropTime).toSeconds() < 0;
 		}
 	}
 
@@ -259,7 +263,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 				{
 					infoBoxManager.removeInfoBox(clue.infobox);
 				}
-				combinedTimer = new Timer(droppedClue.timeRemaining, ChronoUnit.SECONDS, itemManager.getImage(23814), this) {
+				combinedTimer = new InfoBox(itemManager.getImage(23814), this) {
 					@Override
 					public Color getTextColor()
 					{
@@ -267,7 +271,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 						{
 							if (clue.invalidTimer || clue.notified) return Color.RED;
 						}
-						return super.getTextColor();
+						return Color.WHITE;
 					}
 
 					@Override
@@ -299,14 +303,14 @@ public class ClueScrollJugglingPlugin extends Plugin
 				combinedTimer.setMenuEntries(menuEntries);
 			}
 		} else {
-			Timer timer = new Timer(droppedClue.timeRemaining, ChronoUnit.SECONDS, itemManager.getImage(droppedClue.groundItemKey.getItemId()), this)
+			InfoBox timer = new InfoBox(itemManager.getImage(droppedClue.groundItemKey.getItemId()), this)
 			{
 				@Override
 				public Color getTextColor()
 				{
-					return (droppedClue.invalidTimer || droppedClue.notified)
+					return droppedClue.invalidTimer || droppedClue.notified
 						? Color.RED
-						: super.getTextColor();
+						: Color.WHITE;
 				}
 
 				@Override
@@ -412,22 +416,39 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 	@Subscribe
 	public void onGameTick(GameTick gameTick) {
-		if (!droppedClues.isEmpty() && showNotifications())
+		if (droppedClues.isEmpty()) return;
+
+		int dropTime = config.hourDropTimer();
+		if (showNotifications())
 		{
 			for (DroppedClue droppedClue : droppedClues)
 			{
-				if (!droppedClue.notified && droppedClue.getDuration(config.hourDropTimer()).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
+				if (!droppedClue.notified && droppedClue.getDuration(dropTime).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
 				{
 					notifier.notify("Your clue scroll is about to disappear!");
 					droppedClue.notified = true;
 				}
 			}
 		}
+		List<DroppedClue> toRemove = new ArrayList<>();
+		for (int i = 0; i < droppedClues.size(); i++)
+		{
+			DroppedClue droppedClue = droppedClues.get(i);
+			if (droppedClue.isExpired(dropTime)) {
+				toRemove.add(droppedClue);
+			}
+		}
+		for (DroppedClue droppedClue : toRemove)
+		{
+			removeInfoBox(droppedClue);
+		}
+		toRemove.clear();
 	}
 
 	@Override
 	protected void startUp()
 	{
+		onLogin();
 		eventBus.register(groundItemPluginStuff);
 		groundItemPluginStuff.startUp();
 	}
@@ -436,6 +457,8 @@ public class ClueScrollJugglingPlugin extends Plugin
 	protected void shutDown()
 	{
 		eventBus.unregister(groundItemPluginStuff);
+		onLogout();
+		configManager.setRSProfileConfiguration(CONFIG_GROUP, "timesAreAccurate", false);
 	}
 
 	@RequiredArgsConstructor
