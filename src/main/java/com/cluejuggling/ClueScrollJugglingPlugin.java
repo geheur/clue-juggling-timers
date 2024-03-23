@@ -118,15 +118,15 @@ public class ClueScrollJugglingPlugin extends Plugin
 	}
 
 	private void onLogin() {
-//		System.out.println("login " + Thread.currentThread().getName());
+		log.debug("login " + Thread.currentThread().getName());
 
 		Boolean timesAreAccurate = configManager.getRSProfileConfiguration(CONFIG_GROUP, "timesAreAccurate", Boolean.class);
 		if (timesAreAccurate == null) timesAreAccurate = false;
 		configManager.setRSProfileConfiguration(CONFIG_GROUP, "timesAreAccurate", false);
 
 		droppedClues = gson.fromJson(configManager.getRSProfileConfiguration(CONFIG_GROUP, "clueData"), new TypeToken<List<DroppedClue>>(){}.getType());
-//		System.out.println("   dropped clues is " + droppedClues);
 		if (droppedClues == null) droppedClues = new ArrayList<>();
+		log.debug("|  dropped clues is " + droppedClues.size());
 		// Unfortunately, varc 526 (play time) is not sent unless the tab that shows it is selected.
 		for (DroppedClue droppedClue : droppedClues)
 		{
@@ -137,7 +137,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	}
 
 	private void onLogout() {
-//		System.out.println("logout " + Thread.currentThread().getName());
+		log.debug("logout " + Thread.currentThread().getName());
 		if (droppedClues.isEmpty()) return;
 
 		for (DroppedClue droppedClue : droppedClues)
@@ -235,6 +235,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 			DroppedClue droppedClue = new DroppedClue(Instant.now(), (int) between.getSeconds(), groundItemKey, groundItem.getLootType() == LootType.DROPPED);
 			droppedClues.add(droppedClue);
 			saveDroppedClues();
+			log.debug("adding infobox from spawned item " + itemComposition.getMembersName());
 			addInfobox(droppedClue);
 		}
 	}
@@ -260,6 +261,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	{
 		if (config.combineTimers() && droppedClues.size() > 1) {
 			if (combinedTimer == null) {
+				log.debug("adding combined infobox");
 				for (DroppedClue clue : droppedClues)
 				{
 					infoBoxManager.removeInfoBox(clue.infobox);
@@ -304,6 +306,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 				combinedTimer.setMenuEntries(menuEntries);
 			}
 		} else {
+			log.debug("adding infobox");
 			InfoBox timer = new InfoBox(itemManager.getImage(droppedClue.groundItemKey.getItemId()), this)
 			{
 				@Override
@@ -364,6 +367,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 		ClueTier clueTier = ClueTier.getClueTier(itemManager.getItemComposition(droppedClue.groundItemKey.getItemId()).getMembersName());
 		client.createMenuEntry(index).setOption("| " + clueTier.getColoredName()).setTarget(formatWithSeconds(droppedClue.getDuration(config.hourDropTimer())));
 		client.createMenuEntry(index).setOption("|     Remove").setTarget(target).onClick(e1 -> {
+			log.debug("manual infobox removal " + droppedClue);
 			removeInfoBox(droppedClue);
 		});
 //		client.createMenuEntry(i).setOption("   ").setTarget(droppedClue.groundItemKey.getLocation().toString());
@@ -393,6 +397,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), tile.getWorldLocation());
 
 		DroppedClue droppedClue = getDroppedClue(groundItemKey);
+		log.debug(client.getTickCount() + " item despawned " + itemComposition.getMembersName() + " " + (droppedClue != null));
 		if (droppedClue != null) {
 			removeInfoBox(droppedClue);
 		}
@@ -400,14 +405,17 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 	private void removeInfoBox(DroppedClue droppedClue)
 	{
-		droppedClues.remove(droppedClue);
+		boolean removed = droppedClues.remove(droppedClue);
+		log.debug("removed clue " + removed + " " + droppedClues.size());
 		saveDroppedClues();
 		if (droppedClue.infobox != null) {
 			infoBoxManager.removeInfoBox(droppedClue.infobox);
+			log.debug("|  removed infobox");
 		}
 		if (combinedTimer != null && droppedClues.size() <= 1)
 		{
 			infoBoxManager.removeInfoBox(combinedTimer);
+			log.debug("|  removed combined infobox");
 			combinedTimer = null;
 			if (droppedClues.size() == 1) {
 				addInfobox(droppedClues.get(0));
@@ -441,8 +449,10 @@ public class ClueScrollJugglingPlugin extends Plugin
 		}
 		for (DroppedClue droppedClue : toRemove)
 		{
+			log.debug("removing infobox due to expiry");
 			removeInfoBox(droppedClue);
 		}
+		if (toRemove.size() > 0) log.debug("removed " + toRemove.size());
 		toRemove.clear();
 	}
 
@@ -499,6 +509,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	@Subscribe
 	public void onCommandExecuted(CommandExecuted e) {
 		if (e.getCommand().equals("clearclues")) {
+			log.debug("clearclues");
 			for (DroppedClue droppedClue : new ArrayList<>(droppedClues))
 			{
 				removeInfoBox(droppedClue);
