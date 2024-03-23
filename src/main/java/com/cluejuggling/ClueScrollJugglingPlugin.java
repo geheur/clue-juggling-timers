@@ -438,6 +438,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 				}
 			}
 		}
+
 		List<DroppedClue> toRemove = new ArrayList<>();
 		for (int i = 0; i < droppedClues.size(); i++)
 		{
