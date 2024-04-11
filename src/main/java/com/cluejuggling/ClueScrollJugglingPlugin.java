@@ -368,7 +368,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 		client.createMenuEntry(index).setOption("| " + clueTier.getColoredName()).setTarget(formatWithSeconds(droppedClue.getDuration(config.hourDropTimer())));
 		client.createMenuEntry(index).setOption("|     Remove").setTarget(target).onClick(e1 -> {
 			log.debug("manual infobox removal " + droppedClue);
-			removeInfoBox(droppedClue);
+			removeClue(droppedClue);
 		});
 //		client.createMenuEntry(i).setOption("   ").setTarget(droppedClue.groundItemKey.getLocation().toString());
 	}
@@ -399,11 +399,11 @@ public class ClueScrollJugglingPlugin extends Plugin
 		DroppedClue droppedClue = getDroppedClue(groundItemKey);
 		log.debug(client.getTickCount() + " item despawned " + itemComposition.getMembersName() + " " + (droppedClue != null));
 		if (droppedClue != null) {
-			removeInfoBox(droppedClue);
+			removeClue(droppedClue);
 		}
 	}
 
-	private void removeInfoBox(DroppedClue droppedClue)
+	private void removeClue(DroppedClue droppedClue)
 	{
 		boolean removed = droppedClues.remove(droppedClue);
 		log.debug("removed clue " + removed + " " + droppedClues.size());
@@ -450,7 +450,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 		for (DroppedClue droppedClue : toRemove)
 		{
 			log.debug("removing infobox due to expiry");
-			removeInfoBox(droppedClue);
+			removeClue(droppedClue);
 		}
 		if (toRemove.size() > 0) log.debug("removed " + toRemove.size());
 		toRemove.clear();
@@ -512,7 +512,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 			log.debug("clearclues");
 			for (DroppedClue droppedClue : new ArrayList<>(droppedClues))
 			{
-				removeInfoBox(droppedClue);
+				removeClue(droppedClue);
 			}
 		}
 	}
