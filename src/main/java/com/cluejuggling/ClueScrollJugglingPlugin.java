@@ -250,6 +250,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 	private void addInfobox(DroppedClue droppedClue)
 	{
+		removeOrphanedInfoboxes();
 		if (config.combineTimers() && droppedClues.size() > 1) {
 			if (combinedTimer == null) {
 				log.debug("adding combined infobox");
@@ -412,11 +413,19 @@ public class ClueScrollJugglingPlugin extends Plugin
 				addInfobox(droppedClues.get(0));
 			}
 		}
+
+		removeOrphanedInfoboxes();
 	}
 
-	private int gameTick = -1;
-	private final List<GroundItem> itemsSpawned = new ArrayList<>();
-	private final List<GroundItemKey> itemsDespawned = new ArrayList<>();
+	private void removeOrphanedInfoboxes()
+	{
+		for (InfoBox infoBox : infoBoxManager.getInfoBoxes())
+		{
+			if (infoBox.getClass().getName().contains("ClueScrollJugglingPlugin")) {
+				log.debug("removed orphaned infobox");
+			}
+		}
+	}
 
 	@Subscribe
 	public void onGameTick(GameTick e) {
@@ -455,6 +464,10 @@ public class ClueScrollJugglingPlugin extends Plugin
 		}
 	}
 
+	private int gameTick = -1;
+	private final List<GroundItem> itemsSpawned = new ArrayList<>();
+	private final List<GroundItemKey> itemsDespawned = new ArrayList<>();
+
 	private void handleItemSpawns()
 	{
 		// It is possible for fake despawns to happen when you go up and down ladders or go near an item (like 20 tiles or so?). This is detectable by a despawn followed by a spawn. I want to skip these fake despawns.
@@ -473,7 +486,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 				}
 			}
 
-			// This is a real despawn, so process it.
+			// This is a real despawn.
 			DroppedClue droppedClue = getDroppedClue(groundItemKey);
 			log.debug(client.getTickCount() + " item despawned " + itemId + " " + itemManager.getItemComposition(itemId).getMembersName() + " " + (droppedClue != null));
 			if (droppedClue != null) {
