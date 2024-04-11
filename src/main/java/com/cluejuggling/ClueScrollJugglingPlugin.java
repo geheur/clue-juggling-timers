@@ -123,6 +123,9 @@ public class ClueScrollJugglingPlugin extends Plugin
 		if (timesAreAccurate == null) timesAreAccurate = false;
 		configManager.setRSProfileConfiguration(CONFIG_GROUP, "timesAreAccurate", false);
 
+		if (droppedClues.size() > 0) {
+			log.error("droppedClues.size() " + droppedClues.size());
+		}
 		droppedClues = gson.fromJson(configManager.getRSProfileConfiguration(CONFIG_GROUP, "clueData"), new TypeToken<List<DroppedClue>>(){}.getType());
 		if (droppedClues == null) droppedClues = new ArrayList<>();
 		log.debug("|  dropped clues is " + droppedClues.size());
@@ -156,10 +159,10 @@ public class ClueScrollJugglingPlugin extends Plugin
 		droppedClues.clear();
 	}
 
-	private int lastGameState = 0;
+	private int lastGameState = -1;
 	@Subscribe
 	public void onGameStateChanged(GameStateChanged e) {
-//		System.out.println("game state changed from " + lastGameState + " to " + e.getGameState());
+		log.debug("game state changed from " + lastGameState + " to " + e.getGameState());
 		if (e.getGameState() == GameState.LOADING) return;
 
 		int LOGGED_IN_STATE = GameState.LOGGED_IN.getState();
@@ -419,11 +422,22 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 	private void removeOrphanedInfoboxes()
 	{
-		for (InfoBox infoBox : infoBoxManager.getInfoBoxes())
-		{
+		next_infobox:
+		for (InfoBox infoBox : infoBoxManager.getInfoBoxes()) {
 			if (infoBox.getClass().getName().contains("ClueScrollJugglingPlugin")) {
-				log.debug("removed orphaned infobox");
+				if (infoBox == combinedTimer) continue next_infobox;
+				if (combinedTimer == null) {
+					for (DroppedClue droppedClue : droppedClues) {
+						if (infoBox == droppedClue.infobox) continue next_infobox;
+					}
+				}
+				infoBoxManager.removeInfoBox(infoBox);
+				log.error("removed orphaned infobox");
 			}
+		}
+		if (droppedClues.size() <= 1) {
+			infoBoxManager.removeInfoBox(combinedTimer);
+			combinedTimer = null;
 		}
 	}
 
@@ -519,7 +533,13 @@ public class ClueScrollJugglingPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		onLogin();
+		lastGameState = -1;
+		clientThread.invokeLater(() -> {
+			if (lastGameState == -1) lastGameState = GameState.LOGIN_SCREEN.getState();
+			GameStateChanged gameStateChanged = new GameStateChanged();
+			gameStateChanged.setGameState(client.getGameState());
+			this.onGameStateChanged(gameStateChanged);
+		});
 		eventBus.register(groundItemPluginStuff);
 		groundItemPluginStuff.startUp();
 	}
@@ -527,9 +547,11 @@ public class ClueScrollJugglingPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		clientThread.invokeLater(() -> {
+			onLogout();
+			configManager.setRSProfileConfiguration(CONFIG_GROUP, "timesAreAccurate", false);
+		});
 		eventBus.unregister(groundItemPluginStuff);
-		onLogout();
-		configManager.setRSProfileConfiguration(CONFIG_GROUP, "timesAreAccurate", false);
 	}
 
 	@RequiredArgsConstructor
@@ -569,11 +591,12 @@ public class ClueScrollJugglingPlugin extends Plugin
 	@Subscribe
 	public void onCommandExecuted(CommandExecuted e) {
 		if (e.getCommand().equals("clearclues")) {
-			log.debug("clearclues");
+			log.warn("clearclues");
 			for (DroppedClue droppedClue : new ArrayList<>(droppedClues))
 			{
 				removeClue(droppedClue);
 			}
+			removeOrphanedInfoboxes();
 		}
 	}
 }
