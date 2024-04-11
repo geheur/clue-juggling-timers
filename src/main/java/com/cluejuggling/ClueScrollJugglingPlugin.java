@@ -21,7 +21,6 @@ import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
-import net.runelite.api.Tile;
 import net.runelite.api.TileItem;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
@@ -186,6 +185,9 @@ public class ClueScrollJugglingPlugin extends Plugin
 			GameStateChanged gameStateChanged = new GameStateChanged();
 			gameStateChanged.setGameState(GameState.LOGIN_SCREEN);
 			this.onGameStateChanged(gameStateChanged);
+
+			itemsSpawned.clear();
+			itemsDespawned.clear();
 		});
 	}
 
@@ -223,21 +225,10 @@ public class ClueScrollJugglingPlugin extends Plugin
 		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
 		ClueTier clueTier = ClueTier.getClueTier(itemComposition.getMembersName());
 		if (clueTier == null || !clueTier.showTimers(config)) return;
-		Tile tile = itemSpawned.getTile();
 
-		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), tile.getWorldLocation());
-
-		if (getDroppedClue(groundItemKey) == null) {
-			GroundItem groundItem = groundItemPluginStuff.buildGroundItem(tile, item);
-			Instant instant = groundItemPluginStuff.calculateDespawnTime(groundItem);
-			if (instant == null) return;
-			Duration between = Duration.between(Instant.now(), instant);
-			DroppedClue droppedClue = new DroppedClue(Instant.now(), (int) between.getSeconds(), groundItemKey, groundItem.getLootType() == LootType.DROPPED);
-			droppedClues.add(droppedClue);
-			saveDroppedClues();
-			log.debug("adding infobox from spawned item " + itemComposition.getMembersName());
-			addInfobox(droppedClue);
-		}
+		GroundItem groundItem = groundItemPluginStuff.buildGroundItem(itemSpawned.getTile(), item);
+		itemsSpawned.add(groundItem);
+		gameTick = client.getTickCount();
 	}
 
 	private void saveDroppedClues()
@@ -392,15 +383,15 @@ public class ClueScrollJugglingPlugin extends Plugin
 		TileItem item = itemDespawned.getItem();
 		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
 		if (!itemComposition.getName().toLowerCase().startsWith("clue scroll")) return;
-		Tile tile = itemDespawned.getTile();
+//		// Items can despawn and then immediately spawn again when you come near them (within like, 20 tiles or so). This avoids this.
+//		if (!tile.getWorldLocation().equals(client.getLocalPlayer().getWorldLocation())) {
+//			System.out.println("clue despawned ");
+//			return;
+//		}
 
-		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), tile.getWorldLocation());
-
-		DroppedClue droppedClue = getDroppedClue(groundItemKey);
-		log.debug(client.getTickCount() + " item despawned " + itemComposition.getMembersName() + " " + (droppedClue != null));
-		if (droppedClue != null) {
-			removeClue(droppedClue);
-		}
+		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), itemDespawned.getTile().getWorldLocation());
+		itemsDespawned.add(groundItemKey);
+		gameTick = client.getTickCount();
 	}
 
 	private void removeClue(DroppedClue droppedClue)
@@ -423,37 +414,93 @@ public class ClueScrollJugglingPlugin extends Plugin
 		}
 	}
 
-	@Subscribe
-	public void onGameTick(GameTick gameTick) {
-		if (droppedClues.isEmpty()) return;
+	private int gameTick = -1;
+	private final List<GroundItem> itemsSpawned = new ArrayList<>();
+	private final List<GroundItemKey> itemsDespawned = new ArrayList<>();
 
-		int dropTime = config.hourDropTimer();
-		if (showNotifications())
-		{
-			for (DroppedClue droppedClue : droppedClues)
+	@Subscribe
+	public void onGameTick(GameTick e) {
+		if (client.getTickCount() == gameTick) {
+			handleItemSpawns();
+		}
+
+		if (!droppedClues.isEmpty()) {
+			int dropTime = config.hourDropTimer();
+			if (showNotifications())
 			{
-				if (!droppedClue.notified && droppedClue.getDuration(dropTime).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
+				for (DroppedClue droppedClue : droppedClues)
 				{
-					notifier.notify("Your clue scroll is about to disappear!");
-					droppedClue.notified = true;
+					if (!droppedClue.notified && droppedClue.getDuration(dropTime).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
+					{
+						notifier.notify("Your clue scroll is about to disappear!");
+						droppedClue.notified = true;
+					}
 				}
 			}
+			List<DroppedClue> toRemove = new ArrayList<>();
+			for (int i = 0; i < droppedClues.size(); i++)
+			{
+				DroppedClue droppedClue = droppedClues.get(i);
+				if (droppedClue.isExpired(dropTime)) {
+					toRemove.add(droppedClue);
+				}
+			}
+			for (DroppedClue droppedClue : toRemove)
+			{
+				log.debug("removing infobox due to expiry");
+				removeClue(droppedClue);
+			}
+			if (toRemove.size() > 0) log.debug("removed " + toRemove.size());
+			toRemove.clear();
 		}
-		List<DroppedClue> toRemove = new ArrayList<>();
-		for (int i = 0; i < droppedClues.size(); i++)
+	}
+
+	private void handleItemSpawns()
+	{
+		// It is possible for fake despawns to happen when you go up and down ladders or go near an item (like 20 tiles or so?). This is detectable by a despawn followed by a spawn. I want to skip these fake despawns.
+		outer:
+		for (GroundItemKey groundItemKey : itemsDespawned)
 		{
-			DroppedClue droppedClue = droppedClues.get(i);
-			if (droppedClue.isExpired(dropTime)) {
-				toRemove.add(droppedClue);
+			// Check if it's a real despawn by seeing if there is a spawn event in the same tick.
+			int itemId = groundItemKey.getItemId();
+			for (int i = 0; i < itemsSpawned.size(); i++)
+			{
+				GroundItem groundItem = itemsSpawned.get(i);
+				if (groundItem.getLootType() != LootType.DROPPED && groundItem.getId() == itemId && groundItem.getLocation().equals(groundItemKey.getLocation())) {
+					log.debug(client.getTickCount() + " item despawned (fake) " + itemId + " " + itemManager.getItemComposition(itemId).getMembersName());
+					itemsSpawned.remove(i);
+					continue outer;
+				}
+			}
+
+			// This is a real despawn, so process it.
+			DroppedClue droppedClue = getDroppedClue(groundItemKey);
+			log.debug(client.getTickCount() + " item despawned " + itemId + " " + itemManager.getItemComposition(itemId).getMembersName() + " " + (droppedClue != null));
+			if (droppedClue != null) {
+				removeClue(droppedClue);
 			}
 		}
-		for (DroppedClue droppedClue : toRemove)
+		for (GroundItem groundItem : itemsSpawned)
 		{
-			log.debug("removing infobox due to expiry");
-			removeClue(droppedClue);
+			GroundItemKey groundItemKey = new GroundItemKey(groundItem.getId(), groundItem.getLocation());
+			if (getDroppedClue(groundItemKey) == null) {
+				Instant instant = groundItemPluginStuff.calculateDespawnTime(groundItem);
+				if (instant == null) {
+					log.debug("spawned item (null instant) " + groundItemKey.getItemId() + " " + itemManager.getItemComposition(groundItemKey.getItemId()).getMembersName());
+					continue;
+				}
+				Duration between = Duration.between(Instant.now(), instant);
+				DroppedClue droppedClue = new DroppedClue(Instant.now(), (int) between.getSeconds(), groundItemKey, groundItem.getLootType() == LootType.DROPPED);
+				droppedClues.add(droppedClue);
+				saveDroppedClues();
+				log.debug("adding infobox from spawned item " + groundItemKey.getItemId() + " " + itemManager.getItemComposition(groundItemKey.getItemId()).getMembersName());
+				addInfobox(droppedClue);
+			} else {
+				log.debug("spawned item (already tracked) " + groundItemKey.getItemId() + " " + itemManager.getItemComposition(groundItemKey.getItemId()).getMembersName());
+			}
 		}
-		if (toRemove.size() > 0) log.debug("removed " + toRemove.size());
-		toRemove.clear();
+		itemsSpawned.clear();
+		itemsDespawned.clear();
 	}
 
 	@Override
