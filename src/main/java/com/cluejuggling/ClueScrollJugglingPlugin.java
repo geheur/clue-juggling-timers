@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.ItemID;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.TileItem;
@@ -601,6 +602,43 @@ public class ClueScrollJugglingPlugin extends Plugin
 				removeClue(droppedClue);
 			}
 			removeOrphanedInfoboxes();
+		}
+		if (e.getCommand().equals("orphaninfoboxes")) {
+			droppedClues.clear();
+		}
+		if (e.getCommand().equals("findinfoboxes")) {
+			int count = 0;
+			for (InfoBox infoBox : infoBoxManager.getInfoBoxes())
+			{
+				if (infoBox.getClass().getName().contains("ClueScrollJugglingPlugin")) {
+					count++;
+				}
+			}
+			System.out.println(droppedClues.size());
+			System.out.println(count);
+		}
+		if (e.getCommand().equals("listclues")) {
+			for (DroppedClue droppedClue : new ArrayList<>(droppedClues))
+			{
+				System.out.println(droppedClue);
+				removeClue(droppedClue);
+			}
+		}
+		if (e.getCommand().equals("ctt")) {
+			String[] args = e.getArguments();
+			int itemId = args.length < 1 || args[0].equals("beginner") ? ItemID.CLUE_SCROLL_BEGINNER :
+				args[0].equals("easy") ? ItemID.CLUE_SCROLL_EASY :
+				args[0].equals("medium") ? ItemID.CLUE_SCROLL_MEDIUM :
+				args[0].equals("hard") ? ItemID.CLUE_SCROLL_HARD :
+				args[0].equals("elite") ? ItemID.CLUE_SCROLL_ELITE :
+				ItemID.CLUE_SCROLL_MASTER;
+			DroppedClue droppedClue = new DroppedClue(
+				Instant.now(),
+				args.length > 1 ? Integer.parseInt(args[1]) : 3600,
+				new GroundItemKey(itemId, client.getLocalPlayer().getWorldLocation()),
+				true);
+			droppedClues.add(droppedClue);
+			addInfobox(droppedClue);
 		}
 	}
 }
