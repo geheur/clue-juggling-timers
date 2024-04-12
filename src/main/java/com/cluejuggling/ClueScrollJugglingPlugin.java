@@ -364,7 +364,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	private void addClueMenuEntries(int index, DroppedClue droppedClue, String target)
 	{
 		ClueTier clueTier = ClueTier.getClueTier(itemManager.getItemComposition(droppedClue.groundItemKey.getItemId()).getMembersName());
-		client.createMenuEntry(index).setOption("| " + clueTier.getColoredName()).setTarget(formatWithSeconds(droppedClue.getDuration(config.hourDropTimer())));
+		client.createMenuEntry(index).setOption("| " + clueTier.getColoredName()).setTarget(droppedClue.invalidTimer ? "?" : formatWithSeconds(droppedClue.getDuration(config.hourDropTimer())));
 		client.createMenuEntry(index).setOption("|     Remove").setTarget(target).onClick(e1 -> {
 			log.debug("manual infobox removal " + droppedClue);
 			removeClue(droppedClue);
