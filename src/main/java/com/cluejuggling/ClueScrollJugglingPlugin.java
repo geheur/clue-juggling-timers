@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.function.Predicate;
 import javax.inject.Inject;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -84,7 +83,6 @@ public class ClueScrollJugglingPlugin extends Plugin
 	private InfoBox combinedTimer = null;
 
 	@Data
-	@EqualsAndHashCode(exclude={"notified"})
 	public static final class DroppedClue
 	{
 		public DroppedClue(Instant startTime, int timeRemaining, GroundItemKey groundItemKey, boolean droppedByPlayer) {
@@ -325,7 +323,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 			};
 			infoBoxManager.addInfoBox(timer);
 			List<OverlayMenuEntry> menuEntries = timer.getMenuEntries();
-			menuEntries.add(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY, "infobox jank", "" + droppedClues.indexOf(droppedClue)));
+			menuEntries.add(new OverlayMenuEntry(MenuAction.RUNELITE_OVERLAY, "infobox jank", "" + droppedClue.hashCode()));
 			timer.setMenuEntries(menuEntries);
 			droppedClue.infobox = timer;
 		}
@@ -348,9 +346,15 @@ public class ClueScrollJugglingPlugin extends Plugin
 						addClueMenuEntries(i, droppedClue, "clue " + i1);
 					}
 				} else {
-					DroppedClue droppedClue = droppedClues.get(Integer.parseInt(Text.removeTags(menuEntry.getTarget())));
-					addClueMenuEntries(i, droppedClue, "clue");
-					client.setMenuEntries(ArrayUtils.remove(client.getMenuEntries(), i + 2));
+					int hashCode = Integer.parseInt(Text.removeTags(menuEntry.getTarget()));
+					for (DroppedClue droppedClue : droppedClues)
+					{
+						if (droppedClue.hashCode() == hashCode) {
+							addClueMenuEntries(i, droppedClue, "clue");
+							client.setMenuEntries(ArrayUtils.remove(client.getMenuEntries(), i + 2));
+							break;
+						}
+					}
 				}
 				break;
 			}
