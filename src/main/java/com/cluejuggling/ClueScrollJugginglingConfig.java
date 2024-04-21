@@ -90,13 +90,26 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "hourDropTimer",
 		name = "Clue drop time",
 		description = "It is 60 minutes, but you might want to use a lower number due to inaccuracies in this plugin's tracking.",
+		hidden = true,
 		position = 7
 	)
-	@Units(Units.MINUTES)
-	@Range(max=60)
 	default int hourDropTimer()
 	{
 		return 59;
+	}
+
+	@ConfigItem(
+		keyName = "dropTimerReduction",
+		name = "Drop timer multiplier",
+		description = "Due to inaccuracies in this plugin's tracking, you might want to set something below 100.",
+		position = 7
+	)
+	@Units(Units.PERCENT)
+	@Range(max=100)
+	default int dropTimerReduction()
+	{
+		int previousValue = hourDropTimer();
+		return (int) Math.floor(previousValue / 60.0 * 100);
 	}
 
 	@ConfigItem(

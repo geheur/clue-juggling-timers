@@ -99,19 +99,17 @@ public class ClueScrollJugglingPlugin extends Plugin
 		boolean notified = false;
 		transient boolean invalidTimer = false;
 		boolean droppedByPlayer;
-		ClueTier tier;
 
 		transient InfoBox infobox = null; // if it exists
 
-		public Duration getDuration(int dropTime)
+		public Duration getDuration(int percentageReduction)
 		{
-			return Duration.between(Instant.now(), startTime.plus(Duration.ofSeconds(timeRemaining)))
-				.plus(Duration.ofMinutes(droppedByPlayer ? dropTime - 60 : 0));
+			return Duration.between(Instant.now(), startTime.plus(Duration.ofSeconds((int) (timeRemaining * (percentageReduction / 100.0)))));
 		}
 
-		public boolean isExpired(int dropTime)
+		public boolean isExpired(int percentageReduction)
 		{
-			return getDuration(dropTime).toSeconds() < 0;
+			return getDuration(percentageReduction).toSeconds() < 0;
 		}
 	}
 
@@ -267,14 +265,14 @@ public class ClueScrollJugglingPlugin extends Plugin
 						for (DroppedClue clue : droppedClues)
 						{
 							if (clue.invalidTimer) return "?";
-							int time = (int) clue.getDuration(config.hourDropTimer()).getSeconds();
+							int time = (int) clue.getDuration(config.dropTimerReduction()).getSeconds();
 							if (time < lowestTime) {
 								lowestTime = time;
 								lowestTimeClue = clue;
 							}
 						}
 
-						Duration timeLeft = lowestTimeClue.getDuration(config.hourDropTimer());
+						Duration timeLeft = lowestTimeClue.getDuration(config.dropTimerReduction());
 						long remainingMinutes = timeLeft.toMinutes();
 						return remainingMinutes >= 10
 							? String.format("%dm", remainingMinutes)
@@ -302,7 +300,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 				public String getText()
 				{
 					if (droppedClue.invalidTimer) return "?";
-					Duration timeLeft = droppedClue.getDuration(config.hourDropTimer());
+					Duration timeLeft = droppedClue.getDuration(config.dropTimerReduction());
 					long remainingMinutes = timeLeft.toMinutes();
 					return remainingMinutes >= 10
 						? String.format("%dm", remainingMinutes)
@@ -449,7 +447,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 		}
 
 		if (!droppedClues.isEmpty()) {
-			int dropTime = config.hourDropTimer();
+			int dropTime = config.dropTimerReduction();
 			if (showNotifications())
 			{
 				for (DroppedClue droppedClue : droppedClues)

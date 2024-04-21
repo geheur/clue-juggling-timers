@@ -24,6 +24,7 @@
  */
 package com.cluejuggling;
 
+import java.time.Duration;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Value;
@@ -53,6 +54,8 @@ class GroundItem
 	@Nullable
 	private Instant spawnTime;
 	private boolean stackable;
+	private Duration despawnTime;
+	private Duration visibleTime;
 
 	int getHaPrice()
 	{
