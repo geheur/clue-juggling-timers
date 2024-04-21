@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.ItemComposition;
+import net.runelite.api.ItemID;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
 import net.runelite.api.TileItem;
@@ -219,19 +220,6 @@ public class ClueScrollJugglingPlugin extends Plugin
 		return configManager.getConfig(ClueScrollJugginglingConfig.class);
 	}
 
-	@Subscribe
-	public void onItemSpawned(ItemSpawned itemSpawned)
-	{
-		TileItem item = itemSpawned.getItem();
-		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
-		ClueTier clueTier = ClueTier.getClueTier(itemComposition.getMembersName());
-		if (clueTier == null || !clueTier.showTimers(config)) return;
-
-		GroundItem groundItem = groundItemPluginStuff.buildGroundItem(itemSpawned.getTile(), item);
-		itemsSpawned.add(groundItem);
-		gameTick = client.getTickCount();
-	}
-
 	private void saveDroppedClues()
 	{
 //		System.out.println("saving clues: " + gson.toJson(droppedClues));
@@ -300,7 +288,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 			}
 		} else {
 			log.debug("adding infobox");
-			InfoBox timer = new InfoBox(itemManager.getImage(droppedClue.groundItemKey.getItemId()), this)
+			InfoBox timer = new InfoBox(itemManager.getImage(droppedClue.groundItemKey.getItemId() == ItemID.CHALLENGE_SCROLL_ELITE ? ItemID.DEERSTALKER : droppedClue.groundItemKey.getItemId()), this)
 			{
 				@Override
 				public Color getTextColor()
@@ -363,7 +351,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 	private void addClueMenuEntries(int index, DroppedClue droppedClue, String target)
 	{
-		ClueTier clueTier = ClueTier.getClueTier(itemManager.getItemComposition(droppedClue.groundItemKey.getItemId()).getMembersName());
+		ClueTier clueTier = ClueTier.getClueTier(itemManager.getItemComposition(droppedClue.groundItemKey.getItemId()));
 		client.createMenuEntry(index).setOption("| " + clueTier.getColoredName()).setTarget(droppedClue.invalidTimer ? "?" : formatWithSeconds(droppedClue.getDuration(config.hourDropTimer())));
 		client.createMenuEntry(index).setOption("|     Remove").setTarget(target).onClick(e1 -> {
 			log.debug("manual infobox removal " + droppedClue);
@@ -386,16 +374,25 @@ public class ClueScrollJugglingPlugin extends Plugin
 	}
 
 	@Subscribe
+	public void onItemSpawned(ItemSpawned itemSpawned)
+	{
+		TileItem item = itemSpawned.getItem();
+		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
+		ClueTier clueTier = ClueTier.getClueTier(itemComposition);
+		if (clueTier == null || !clueTier.showTimers(config)) return;
+
+		GroundItem groundItem = groundItemPluginStuff.buildGroundItem(itemSpawned.getTile(), item);
+		itemsSpawned.add(groundItem);
+		gameTick = client.getTickCount();
+	}
+
+	@Subscribe
 	public void onItemDespawned(ItemDespawned itemDespawned)
 	{
 		TileItem item = itemDespawned.getItem();
 		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
-		if (!itemComposition.getName().toLowerCase().startsWith("clue scroll")) return;
-//		// Items can despawn and then immediately spawn again when you come near them (within like, 20 tiles or so). This avoids this.
-//		if (!tile.getWorldLocation().equals(client.getLocalPlayer().getWorldLocation())) {
-//			System.out.println("clue despawned ");
-//			return;
-//		}
+		ClueTier clueTier = ClueTier.getClueTier(itemComposition);
+		if (clueTier == null) return;
 
 		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), itemDespawned.getTile().getWorldLocation());
 		itemsDespawned.add(groundItemKey);
@@ -566,15 +563,20 @@ public class ClueScrollJugglingPlugin extends Plugin
 		MEDIUM(config -> config.mediumTimers(), ColorUtil.wrapWithColorTag("Medium", Color.decode("#48c26f"))),
 		HARD(config -> config.hardTimers(), ColorUtil.wrapWithColorTag("Hard", Color.decode("#7627ab"))),
 		ELITE(config -> config.eliteTimers(), ColorUtil.wrapWithColorTag("Elite", Color.decode("#9da836"))),
-		MASTER(config -> config.masterTimers(), ColorUtil.wrapWithColorTag("Master", Color.decode("#96421b")))
+		MASTER(config -> config.masterTimers(), ColorUtil.wrapWithColorTag("Master", Color.decode("#96421b"))),
+		ELITE_SHERLOCK_CHALLENGE(config -> config.eliteTimers(), ColorUtil.wrapWithColorTag("Elite (sherlock challenge)", Color.decode("#9da836"))),
 		;
 
 		private final Predicate<ClueScrollJugginglingConfig> showTimer;
 		@Getter
 		public final String coloredName;
 
-		public static ClueTier getClueTier(String clueName)
+		public static ClueTier getClueTier(ItemComposition itemComposition)
 		{
+			if (itemComposition.getId() == ItemID.CHALLENGE_SCROLL_ELITE) {
+				return ClueTier.ELITE_SHERLOCK_CHALLENGE;
+			}
+			String clueName = itemComposition.getMembersName();
 			return
 				clueName.equals("Clue scroll (beginner)") ? ClueTier.BEGINNER :
 				clueName.equals("Clue scroll (easy)") ? ClueTier.EASY :
