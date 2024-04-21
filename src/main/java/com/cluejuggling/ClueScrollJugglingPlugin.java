@@ -8,7 +8,9 @@ import java.awt.Color;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 import javax.inject.Inject;
 import lombok.Data;
@@ -193,7 +195,9 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 	@Subscribe
 	public void onConfigChanged(ConfigChanged e) {
-		if (e.getGroup().equals(CONFIG_GROUP) && e.getKey().equals("combineTimers")) {
+		if (!e.getGroup().equals(CONFIG_GROUP)) return;
+
+		if (e.getKey().equals("combineTimers")) {
 			clientThread.invokeLater(() -> {
 				if (config.combineTimers()) {
 					for (DroppedClue droppedClue : droppedClues)
@@ -210,7 +214,34 @@ public class ClueScrollJugglingPlugin extends Plugin
 					}
 				}
 			});
+		} else if (e.getKey().equals("extraItems")) {
+			updateExtraItems();
 		}
+	}
+
+	Set<Integer> itemIds = new HashSet<>();
+	List<MatchType> matchTypes = new ArrayList<>();
+	List<String> matchStrings = new ArrayList<>();
+
+	private void updateExtraItems()
+	{
+		String[] split = config.extraItems().split(",");
+		itemIds.clear();
+		matchTypes.clear();
+		matchStrings.clear();
+		for (String s : split)
+		{
+			s = s.trim();
+			try {
+				int itemId = Integer.parseInt(s);
+				itemIds.add(itemId);
+			} catch (NumberFormatException ex) {
+				MatchType type = MatchType.getType(s);
+				matchTypes.add(type);
+				matchStrings.add(MatchType.prepareMatch(s, type));
+			}
+		}
+//		System.out.println("config changed extra items " + itemIds.size() + " " + matchTypes.size());
 	}
 
 	@Provides
@@ -349,8 +380,10 @@ public class ClueScrollJugglingPlugin extends Plugin
 
 	private void addClueMenuEntries(int index, DroppedClue droppedClue, String target)
 	{
-		ClueTier clueTier = ClueTier.getClueTier(itemManager.getItemComposition(droppedClue.groundItemKey.getItemId()));
-		client.createMenuEntry(index).setOption("| " + clueTier.getColoredName()).setTarget(droppedClue.invalidTimer ? "?" : formatWithSeconds(droppedClue.getDuration(config.hourDropTimer())));
+		ItemComposition itemComposition = itemManager.getItemComposition(droppedClue.groundItemKey.getItemId());
+		ClueTier clueTier = ClueTier.getClueTier(itemComposition);
+		String name = clueTier != null ? clueTier.getColoredName() : itemComposition.getMembersName();
+		client.createMenuEntry(index).setOption("| " + name).setTarget(droppedClue.invalidTimer ? "?" : formatWithSeconds(droppedClue.getDuration(config.dropTimerReduction())));
 		client.createMenuEntry(index).setOption("|     Remove").setTarget(target).onClick(e1 -> {
 			log.debug("manual infobox removal " + droppedClue);
 			removeClue(droppedClue);
@@ -376,12 +409,31 @@ public class ClueScrollJugglingPlugin extends Plugin
 	{
 		TileItem item = itemSpawned.getItem();
 		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
-		ClueTier clueTier = ClueTier.getClueTier(itemComposition);
-		if (clueTier == null || !clueTier.showTimers(config)) return;
+		if (!isExtraItemMatched(itemComposition)) {
+			ClueTier clueTier = ClueTier.getClueTier(itemComposition);
+			if (clueTier == null || !clueTier.showTimers(config)) return;
+		}
 
 		GroundItem groundItem = groundItemPluginStuff.buildGroundItem(itemSpawned.getTile(), item);
 		itemsSpawned.add(groundItem);
 		gameTick = client.getTickCount();
+	}
+
+	private boolean isExtraItemMatched(ItemComposition itemComposition)
+	{
+		if (itemIds.contains(itemComposition.getId())) {
+			return true;
+		}
+		String membersName = Text.standardize(itemComposition.getMembersName().toLowerCase());
+		for (int i = 0; i < matchTypes.size(); i++)
+		{
+			MatchType matchType = matchTypes.get(i);
+			String matchString = matchStrings.get(i);
+			if (matchType.matches(membersName, matchString)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Subscribe
@@ -389,8 +441,6 @@ public class ClueScrollJugglingPlugin extends Plugin
 	{
 		TileItem item = itemDespawned.getItem();
 		ItemComposition itemComposition = itemManager.getItemComposition(item.getId());
-		ClueTier clueTier = ClueTier.getClueTier(itemComposition);
-		if (clueTier == null) return;
 
 		GroundItemKey groundItemKey = new GroundItemKey(item.getId(), itemDespawned.getTile().getWorldLocation());
 		itemsDespawned.add(groundItemKey);
@@ -533,6 +583,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	protected void startUp()
 	{
 		lastGameState = -1;
+		updateExtraItems();
 		clientThread.invokeLater(() -> {
 			if (lastGameState == -1) lastGameState = GameState.LOGIN_SCREEN.getState();
 			GameStateChanged gameStateChanged = new GameStateChanged();

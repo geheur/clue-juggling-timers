@@ -124,10 +124,21 @@ public interface ClueScrollJugginglingConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "extraItems",
+		name = "Track more items (id or name)",
+		description = "comma separated, * wildcard supported",
+		position = 9
+	)
+	default String extraItems()
+	{
+		return "";
+	}
+
+	@ConfigItem(
 		keyName = "hidden",
 		name = "<html>Shift-right-click the infoboxes for more options.<br>You can use the ::clearclues command to clear all infoboxes.</html>",
 		description = "",
-		position = 9
+		position = 10
 	)
 	default void shiftRightClickInfo()
 	{
