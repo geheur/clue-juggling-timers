@@ -61,7 +61,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 	ItemManager itemManager;
 
 	@Inject
-	private ClueScrollJugginglingConfig config;
+	private ClueScrollJugglingConfig config;
 
 	@Inject
 	private InfoBoxManager infoBoxManager;
@@ -215,8 +215,8 @@ public class ClueScrollJugglingPlugin extends Plugin
 	}
 
 	@Provides
-	public ClueScrollJugginglingConfig getConfig(ConfigManager configManager) {
-		return configManager.getConfig(ClueScrollJugginglingConfig.class);
+	public ClueScrollJugglingConfig getConfig(ConfigManager configManager) {
+		return configManager.getConfig(ClueScrollJugglingConfig.class);
 	}
 
 	@Subscribe
@@ -569,7 +569,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 		MASTER(config -> config.masterTimers(), ColorUtil.wrapWithColorTag("Master", Color.decode("#96421b")))
 		;
 
-		private final Predicate<ClueScrollJugginglingConfig> showTimer;
+		private final Predicate<ClueScrollJugglingConfig> showTimer;
 		@Getter
 		public final String coloredName;
 
@@ -586,7 +586,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 				;
 		}
 
-		public boolean showTimers(ClueScrollJugginglingConfig config)
+		public boolean showTimers(ClueScrollJugglingConfig config)
 		{
 			return showTimer.test(config);
 		}

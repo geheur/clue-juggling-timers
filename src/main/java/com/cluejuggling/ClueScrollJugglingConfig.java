@@ -7,7 +7,7 @@ import net.runelite.client.config.Range;
 import net.runelite.client.config.Units;
 
 @ConfigGroup(ClueScrollJugglingPlugin.CONFIG_GROUP)
-public interface ClueScrollJugginglingConfig extends Config
+public interface ClueScrollJugglingConfig extends Config
 {
 	@ConfigItem(
 		keyName = "notificationTime",
