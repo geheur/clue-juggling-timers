@@ -88,11 +88,10 @@ public class ClueScrollJugglingPlugin extends Plugin
 	@Data
 	public static final class DroppedClue
 	{
-		public DroppedClue(Instant startTime, int timeRemaining, GroundItemKey groundItemKey, boolean droppedByPlayer) {
+		public DroppedClue(Instant startTime, int timeRemaining, GroundItemKey groundItemKey) {
 			this.startTime = startTime;
 			this.timeRemaining = timeRemaining;
 			this.groundItemKey = groundItemKey;
-			this.droppedByPlayer = droppedByPlayer;
 		}
 
 		transient Instant startTime;
@@ -100,7 +99,6 @@ public class ClueScrollJugglingPlugin extends Plugin
 		final GroundItemKey groundItemKey;
 		boolean notified = false;
 		transient boolean invalidTimer = false;
-		boolean droppedByPlayer;
 
 		transient InfoBox infobox = null; // if it exists
 
@@ -542,7 +540,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 			for (int i = 0; i < itemsSpawned.size(); i++)
 			{
 				GroundItem groundItem = itemsSpawned.get(i);
-				if (groundItem.getLootType() != LootType.DROPPED && groundItem.getId() == itemId && groundItem.getLocation().equals(groundItemKey.getLocation())) {
+				if (groundItem.getId() == itemId && groundItem.getLocation().equals(groundItemKey.getLocation())) {
 					log.debug(client.getTickCount() + " item despawned (fake) " + itemId + " " + itemManager.getItemComposition(itemId).getMembersName());
 					itemsSpawned.remove(i);
 					continue outer;
@@ -566,7 +564,7 @@ public class ClueScrollJugglingPlugin extends Plugin
 					continue;
 				}
 				Duration between = Duration.between(Instant.now(), instant);
-				DroppedClue droppedClue = new DroppedClue(Instant.now(), (int) between.getSeconds(), groundItemKey, groundItem.getLootType() == LootType.DROPPED);
+				DroppedClue droppedClue = new DroppedClue(Instant.now(), (int) between.getSeconds(), groundItemKey);
 				droppedClues.add(droppedClue);
 				saveDroppedClues();
 				log.debug("adding infobox from spawned item " + groundItemKey.getItemId() + " " + itemManager.getItemComposition(groundItemKey.getItemId()).getMembersName());
@@ -591,7 +589,6 @@ public class ClueScrollJugglingPlugin extends Plugin
 			this.onGameStateChanged(gameStateChanged);
 		});
 		eventBus.register(groundItemPluginStuff);
-		groundItemPluginStuff.startUp();
 	}
 
 	@Override

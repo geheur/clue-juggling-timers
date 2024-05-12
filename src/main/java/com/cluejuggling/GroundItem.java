@@ -24,10 +24,15 @@
  */
 package com.cluejuggling;
 
+import java.awt.Color;
 import java.time.Duration;
 import lombok.Builder;
 import lombok.Data;
 import lombok.Value;
+import static net.runelite.api.TileItem.OWNERSHIP_GROUP;
+import static net.runelite.api.TileItem.OWNERSHIP_NONE;
+import static net.runelite.api.TileItem.OWNERSHIP_OTHER;
+import static net.runelite.api.TileItem.OWNERSHIP_SELF;
 import net.runelite.api.coords.WorldPoint;
 
 import javax.annotation.Nonnull;
@@ -49,8 +54,8 @@ class GroundItem
 	private int gePrice;
 	private int offset;
 	private boolean tradeable;
-	@Nonnull
-	private LootType lootType;
+	private int ownership;
+	private boolean isPrivate;
 	@Nullable
 	private Instant spawnTime;
 	private boolean stackable;
@@ -69,7 +74,7 @@ class GroundItem
 
 	boolean isMine()
 	{
-		return lootType != LootType.UNKNOWN;
+		return ownership != OWNERSHIP_OTHER;
 	}
 
 	@Value

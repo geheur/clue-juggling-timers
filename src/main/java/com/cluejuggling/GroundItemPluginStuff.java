@@ -70,9 +70,6 @@ public class GroundItemPluginStuff
 		return despawnTime;
 	}
 
-	private final Queue<Integer> droppedItemQueue = EvictingQueue.create(16); // recently dropped items
-	private int lastUsedItem;
-
 	GroundItem buildGroundItem(final Tile tile, final TileItem item)
 	{
 		// Collect the data for the item
@@ -80,8 +77,8 @@ public class GroundItemPluginStuff
 		final ItemComposition itemComposition = plugin.itemManager.getItemComposition(itemId);
 		final int realItemId = itemComposition.getNote() != -1 ? itemComposition.getLinkedNoteId() : itemId;
 		final int alchPrice = itemComposition.getHaPrice();
-		final boolean dropped = tile.getWorldLocation().equals(plugin.client.getLocalPlayer().getWorldLocation()) && droppedItemQueue.remove(itemId);
-		final boolean table = itemId == lastUsedItem && tile.getItemLayer().getHeight() > 0;
+		final int despawnTime = item.getDespawnTime() - plugin.client.getTickCount();
+		final int visibleTime = item.getVisibleTime() - plugin.client.getTickCount();
 
 		final GroundItem groundItem = GroundItem.builder()
 			.id(itemId)
@@ -92,11 +89,12 @@ public class GroundItemPluginStuff
 			.haPrice(alchPrice)
 			.height(tile.getItemLayer().getHeight())
 			.tradeable(itemComposition.isTradeable())
-			.lootType(dropped ? LootType.DROPPED : (table ? LootType.TABLE : LootType.UNKNOWN))
+			.ownership(item.getOwnership())
+			.isPrivate(item.isPrivate())
 			.spawnTime(Instant.now())
 			.stackable(itemComposition.isStackable())
-			.despawnTime(Duration.of(item.getDespawnTime(), RSTimeUnit.GAME_TICKS))
-			.visibleTime(Duration.of(item.getVisibleTime(), RSTimeUnit.GAME_TICKS))
+			.despawnTime(Duration.of(despawnTime, RSTimeUnit.GAME_TICKS))
+			.visibleTime(Duration.of(visibleTime, RSTimeUnit.GAME_TICKS))
 			.build();
 
 //        // Update item price in case it is coins
@@ -111,26 +109,5 @@ public class GroundItemPluginStuff
 //        }
 
 		return groundItem;
-	}
-
-	@Subscribe
-	public void onMenuOptionClicked(MenuOptionClicked menuOptionClicked)
-	{
-		if (menuOptionClicked.isItemOp() && menuOptionClicked.getMenuOption().equals("Drop"))
-		{
-			int itemId = menuOptionClicked.getItemId();
-			// Keep a queue of recently dropped items to better detect
-			// item spawns that are drops
-			droppedItemQueue.add(itemId);
-		}
-		else if (menuOptionClicked.getMenuAction() == MenuAction.WIDGET_TARGET_ON_GAME_OBJECT && plugin.client.getSelectedWidget().getId() == ComponentID.INVENTORY_CONTAINER)
-		{
-			lastUsedItem = plugin.client.getSelectedWidget().getItemId();
-		}
-	}
-
-	public void startUp()
-	{
-		lastUsedItem = -1;
 	}
 }
