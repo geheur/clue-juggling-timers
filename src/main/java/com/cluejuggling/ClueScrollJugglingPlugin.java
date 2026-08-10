@@ -33,6 +33,7 @@ import net.runelite.api.events.MenuOpened;
 import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.config.Notification;
 import net.runelite.client.eventbus.EventBus;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ClientShutdown;
@@ -502,7 +503,13 @@ public class ClueScrollJugglingPlugin extends Plugin
 				{
 					if (!droppedClue.notified && droppedClue.getDuration(dropTime).compareTo(Duration.ofSeconds(config.notificationTime())) < 0)
 					{
-						notifier.notify("Your clue scroll is about to disappear!");
+						String message = "Your clue scroll is about to disappear!";
+						Notification notification = config.customNotification();
+						if (notification.isEnabled()) {
+							notifier.notify(notification, message);
+						} else {
+							notifier.notify(message);
+						}
 						droppedClue.notified = true;
 					}
 				}

@@ -3,6 +3,7 @@ package com.cluejuggling;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Notification;
 import net.runelite.client.config.Range;
 import net.runelite.client.config.Units;
 
@@ -21,10 +22,20 @@ public interface ClueScrollJugginglingConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = "customNotification",
+		name = "Custom notification",
+		description = "Customize the way you are notified when clues are about to despawn",
+		position = 1
+	)
+	default Notification customNotification() {
+		return Notification.ON;
+	}
+
+	@ConfigItem(
 		keyName = "beginnerTimers",
 		name = "Beginner timer",
 		description = "Create timers for beginner clues on the ground.",
-		position = 1
+		position = 2
 	)
 	default boolean beginnerTimers()
 	{
@@ -35,7 +46,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "easyTimers",
 		name = "Easy timer",
 		description = "Create timers for easy clues on the ground.",
-		position = 2
+		position = 3
 	)
 	default boolean easyTimers()
 	{
@@ -46,7 +57,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "mediumTimers",
 		name = "Medium timer",
 		description = "Create timers for medium clues on the ground.",
-		position = 3
+		position = 4
 	)
 	default boolean mediumTimers()
 	{
@@ -57,7 +68,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "hardTimers",
 		name = "Hard timer",
 		description = "Create timers for hard clues on the ground.",
-		position = 4
+		position = 5
 	)
 	default boolean hardTimers()
 	{
@@ -68,7 +79,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "eliteTimers",
 		name = "Elite timer",
 		description = "Create timers for elite clues on the ground.",
-		position = 5
+		position = 6
 	)
 	default boolean eliteTimers()
 	{
@@ -79,7 +90,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "masterTimers",
 		name = "Master timer",
 		description = "Create timers for master clues on the ground.",
-		position = 6
+		position = 7
 	)
 	default boolean masterTimers()
 	{
@@ -91,7 +102,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		name = "Clue drop time",
 		description = "It is 60 minutes, but you might want to use a lower number due to inaccuracies in this plugin's tracking.",
 		hidden = true,
-		position = 7
+		position = 8
 	)
 	default int hourDropTimer()
 	{
@@ -102,7 +113,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "dropTimerReduction",
 		name = "Drop timer multiplier",
 		description = "Due to inaccuracies in this plugin's tracking, you might want to set something below 100.",
-		position = 7
+		position = 9
 	)
 	@Units(Units.PERCENT)
 	@Range(max=100)
@@ -116,7 +127,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "combineTimers",
 		name = "Combine infoboxes",
 		description = "Show only 1 infobox, with the lowest time remaining.",
-		position = 8
+		position = 10
 	)
 	default boolean combineTimers()
 	{
@@ -127,7 +138,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "extraItems",
 		name = "Track more items (id or name)",
 		description = "comma separated, * wildcard supported",
-		position = 9
+		position = 11
 	)
 	default String extraItems()
 	{
@@ -138,7 +149,7 @@ public interface ClueScrollJugginglingConfig extends Config
 		keyName = "hidden",
 		name = "<html>Shift-right-click the infoboxes for more options.<br>You can use the ::clearclues command to clear all infoboxes.</html>",
 		description = "",
-		position = 10
+		position = 12
 	)
 	default void shiftRightClickInfo()
 	{
